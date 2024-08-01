@@ -26,17 +26,19 @@ public class ChatController {
             players.add(chatMessage.getSender());
         }
 
-        // 현재 모든 플레이어에게 새로 들어온 플레이어 정보 전달
-        messagingTemplate.convertAndSend("/topic/public", chatMessage);
 
         // 새로 들어온 플레이어에게 현재 모든 플레이어 정보 전달
         ChatMessage newUserMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.EXISTING_PLAYERS)
+                .type(ChatMessage.MessageType.JOIN)
                 .content(String.join(",", players))
                 .build();
-        messagingTemplate.convertAndSendToUser(chatMessage.getSender(), "/queue/players", newUserMessage);
 
-        return chatMessage;
+        // 모든 플레이어에게 새로 들어온 플레이어 정보 전달
+        messagingTemplate.convertAndSend("/topic/public", newUserMessage);
+
+        System.out.println("Sending existing players: " + newUserMessage.getContent());  // 디버깅 메시지 추가
+
+        return newUserMessage;
     }
 
     @MessageMapping("/chat.ready")
