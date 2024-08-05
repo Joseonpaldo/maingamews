@@ -17,14 +17,13 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private static final int MAX_PLAYERS = 4;
-    private Map<String, List<String>> roomPlayers = new HashMap<>(); // roomPlayers 맵 선언 및 초기화
-    private Map<String, Map<String, String>> playerCharacters = new HashMap<>(); // roomId -> (playerName -> characterSrc)
+    private Map<String, List<String>> roomPlayers = new HashMap<>();
+    private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
 
     public ChatController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
 
-    //로비 입장
     @MessageMapping("/chat.addUser")
     @SendTo("/topic/public")
     public ChatMessage addUser(ChatMessage chatMessage) {
@@ -48,6 +47,16 @@ public class ChatController {
             playerCharacters.put(roomId, charactersInRoom);
         }
 
+        // 입장 메시지 전송
+        ChatMessage joinMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.JOIN)
+                .content(chatMessage.getSender() + " 님이 입장하였습니다.")
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/public", joinMessage);
+
+        // 기존 플레이어 정보 전송
         Map<String, String> charactersInRoom = playerCharacters.get(roomId);
         StringBuilder allPlayersInfo = new StringBuilder();
         for (String player : playersInRoom) {
@@ -59,7 +68,7 @@ public class ChatController {
         }
 
         ChatMessage newUserMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.JOIN)
+                .type(ChatMessage.MessageType.UPDATE)
                 .content(allPlayersInfo.toString())
                 .roomId(roomId)
                 .build();
@@ -72,18 +81,65 @@ public class ChatController {
         return newUserMessage;
     }
 
+    @MessageMapping("/chat.leaveUser")
+    public void leaveUser(ChatMessage chatMessage) {
+        String roomId = chatMessage.getRoomId();
+        String sender = chatMessage.getSender();
+        List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
 
-    // 준비완료
+        if (playersInRoom.contains(sender)) {
+            playersInRoom.remove(sender);
+            roomPlayers.put(roomId, playersInRoom);
+        }
+
+        if (playerCharacters.containsKey(roomId)) {
+            Map<String, String> charactersInRoom = playerCharacters.get(roomId);
+            charactersInRoom.remove(sender);
+            playerCharacters.put(roomId, charactersInRoom);
+        }
+
+        // 퇴장 메시지 작성
+        ChatMessage leaveMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.LEAVE)
+                .content(sender + " 님이 퇴장하였습니다.")
+                .roomId(roomId)
+                .build();
+
+        // 퇴장 메시지 전송
+        messagingTemplate.convertAndSend("/topic/public", leaveMessage);
+
+        // 업데이트된 플레이어 정보 작성
+        StringBuilder allPlayersInfo = new StringBuilder();
+        for (String player : playersInRoom) {
+            allPlayersInfo.append(player).append(":").append(playerCharacters.get(roomId).get(player)).append(",");
+        }
+
+        if (allPlayersInfo.length() > 0) {
+            allPlayersInfo.deleteCharAt(allPlayersInfo.length() - 1);
+        }
+
+        ChatMessage updateUserMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.UPDATE)
+                .content(allPlayersInfo.toString())
+                .roomId(roomId)
+                .build();
+
+        // 업데이트된 플레이어 정보 전송
+        messagingTemplate.convertAndSend("/topic/public", updateUserMessage);
+
+        System.out.println("Sending existing players: " + String.join(",", playersInRoom));
+    }
+
+
+
     @MessageMapping("/chat.ready")
     @SendTo("/topic/public")
     public ChatMessage readyUser(ChatMessage chatMessage) {
-
         System.out.println(chatMessage.getType());
         System.out.println(chatMessage);
         return chatMessage;
     }
 
-    //캐릭터 고를때
     @MessageMapping("/chat.selectCharacter")
     public void selectCharacter(ChatMessage chatMessage) {
         String roomId = chatMessage.getRoomId();
@@ -123,75 +179,35 @@ public class ChatController {
         }
     }
 
-
     @MessageMapping("/chat.deselectCharacter")
     public void deselectCharacter(ChatMessage chatMessage) {
         String roomId = chatMessage.getRoomId();
         String sender = chatMessage.getSender();
+        String characterSrc = chatMessage.getContent();
 
         if (playerCharacters.containsKey(roomId)) {
             Map<String, String> charactersInRoom = playerCharacters.get(roomId);
-            charactersInRoom.remove(sender);
-            playerCharacters.put(roomId, charactersInRoom);
+            if (charactersInRoom.get(sender).equals(characterSrc)) {
+                charactersInRoom.put(sender, "/image/pinkbin.png"); // 기본 캐릭터로 설정
+                playerCharacters.put(roomId, charactersInRoom);
 
-            ChatMessage characterDeselectMessage = ChatMessage.builder()
-                    .type(ChatMessage.MessageType.DESELECT)
-                    .sender(sender)
-                    .roomId(roomId)
-                    .build();
+                ChatMessage characterDeselectMessage = ChatMessage.builder()
+                        .type(ChatMessage.MessageType.DESELECT)
+                        .sender(sender)
+                        .content(characterSrc) // 캐릭터 이미지 경로 포함
+                        .roomId(roomId)
+                        .build();
 
-            System.out.println("dsel: " + characterDeselectMessage);
-            messagingTemplate.convertAndSend("/topic/public", characterDeselectMessage);
+                System.out.println("deselect: " + characterDeselectMessage);
+                messagingTemplate.convertAndSend("/topic/public", characterDeselectMessage);
+            }
         }
     }
 
-
-
-
-    // 유저 방나갈때
-    @MessageMapping("/chat.leaveUser")
-    @SendTo("/topic/public")
-    public ChatMessage leaveUser(ChatMessage chatMessage) {
-        String roomId = chatMessage.getRoomId();
-        String sender = chatMessage.getSender();
-        List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
-
-        if (playersInRoom.contains(sender)) {
-            playersInRoom.remove(sender);
-            roomPlayers.put(roomId, playersInRoom);
-        }
-
-        // 플레이어의 캐릭터 이미지 제거
-        if (playerCharacters.containsKey(roomId)) {
-            Map<String, String> charactersInRoom = playerCharacters.get(roomId);
-            charactersInRoom.remove(sender);
-            playerCharacters.put(roomId, charactersInRoom);
-        }
-
-        ChatMessage leaveMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.LEAVE)
-                .sender(sender)
-                .content(String.join(",", playersInRoom))
-                .roomId(roomId)
-                .build();
-
-        System.out.println(leaveMessage);
-        return leaveMessage;
-    }
-
-
-    //채팅방
     @MessageMapping("/chat.sendMessage")
     @SendTo("/topic/public")
     public ChatMessage sendMessage(ChatMessage chatMessage) {
         System.out.println("chatMessage: " + chatMessage);
         return chatMessage;
     }
-
-
-
-
-
-
-
 }

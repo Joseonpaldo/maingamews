@@ -23,6 +23,7 @@ public class ChatMessage {
         JOIN,
         READY,
         LEAVE,
+        UPDATE,
         EXISTING_PLAYERS, // 추가
         DESELECT, ERROR
     }
