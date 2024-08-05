@@ -16,12 +16,15 @@ public class ChatMessage {
     private String sender;
     private boolean ready;
 
+
     public enum MessageType {
+        SELECT,
         CHAT,
         JOIN,
         READY,
         LEAVE,
-        EXISTING_PLAYERS // 추가
+        EXISTING_PLAYERS, // 추가
+        DESELECT, ERROR
     }
 
 }
