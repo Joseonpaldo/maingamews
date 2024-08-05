@@ -1,11 +1,10 @@
 package org.example.websockettest.controller;
 
 import org.example.websockettest.dto.ChatMessage;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,10 +25,8 @@ public class ChatController {
         this.messagingTemplate = messagingTemplate;
     }
 
-    @MessageMapping("/chat.addUser")
-    @SendTo("/topic/public")
-    public ChatMessage addUser(ChatMessage chatMessage) {
-        String roomId = chatMessage.getRoomId();
+    @MessageMapping("/chat.addUser/{roomId}")
+    public void addUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
         List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
 
         if (playersInRoom.size() >= MAX_PLAYERS) {
@@ -37,7 +34,8 @@ public class ChatController {
                     .type(ChatMessage.MessageType.ERROR)
                     .content("Maximum number of players reached")
                     .build();
-            return errorMessage;
+            messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
+            return;
         }
 
         if (!playersInRoom.contains(chatMessage.getSender())) {
@@ -58,7 +56,7 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
-        messagingTemplate.convertAndSend("/topic/public", joinMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, joinMessage);
 
         // 기존 플레이어 정보 및 맵 정보 전송
         Map<String, String> charactersInRoom = playerCharacters.get(roomId);
@@ -77,7 +75,7 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
-        messagingTemplate.convertAndSend("/topic/public", newUserMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, newUserMessage);
 
         // 맵 정보 전송
         ChatMessage mapMessage = ChatMessage.builder()
@@ -86,17 +84,14 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
-        messagingTemplate.convertAndSend("/topic/public", mapMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
 
         System.out.println("room number: " + newUserMessage.getRoomId());
         System.out.println("Sending existing players: " + newUserMessage.getContent());
-
-        return newUserMessage;
     }
 
-    @MessageMapping("/chat.leaveUser")
-    public void leaveUser(ChatMessage chatMessage) {
-        String roomId = chatMessage.getRoomId();
+    @MessageMapping("/chat.leaveUser/{roomId}")
+    public void leaveUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
         String sender = chatMessage.getSender();
         List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
 
@@ -119,7 +114,7 @@ public class ChatController {
                 .build();
 
         // 퇴장 메시지 전송
-        messagingTemplate.convertAndSend("/topic/public", leaveMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, leaveMessage);
 
         // 업데이트된 플레이어 정보 작성
         StringBuilder allPlayersInfo = new StringBuilder();
@@ -138,24 +133,18 @@ public class ChatController {
                 .build();
 
         // 업데이트된 플레이어 정보 전송
-        messagingTemplate.convertAndSend("/topic/public", updateUserMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, updateUserMessage);
 
         System.out.println("Sending existing players: " + String.join(",", playersInRoom));
     }
 
-
-
-    @MessageMapping("/chat.ready")
-    @SendTo("/topic/public")
-    public ChatMessage readyUser(ChatMessage chatMessage) {
-        System.out.println(chatMessage.getType());
-        System.out.println(chatMessage);
-        return chatMessage;
+    @MessageMapping("/chat.ready/{roomId}")
+    public void readyUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
     }
 
-    @MessageMapping("/chat.selectCharacter")
-    public void selectCharacter(ChatMessage chatMessage) {
-        String roomId = chatMessage.getRoomId();
+    @MessageMapping("/chat.selectCharacter/{roomId}")
+    public void selectCharacter(@DestinationVariable String roomId, ChatMessage chatMessage) {
         String sender = chatMessage.getSender();
         String characterSrc = chatMessage.getContent();
 
@@ -173,7 +162,7 @@ public class ChatController {
 
                 System.out.println("error message: " + errorMessage);
 
-                messagingTemplate.convertAndSend("/topic/public", errorMessage);
+                messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
                 return;
             }
 
@@ -188,13 +177,12 @@ public class ChatController {
                     .build();
 
             System.out.println("character selected: " + characterSelectMessage);
-            messagingTemplate.convertAndSend("/topic/public", characterSelectMessage);
+            messagingTemplate.convertAndSend("/topic/" + roomId, characterSelectMessage);
         }
     }
 
-    @MessageMapping("/chat.deselectCharacter")
-    public void deselectCharacter(ChatMessage chatMessage) {
-        String roomId = chatMessage.getRoomId();
+    @MessageMapping("/chat.deselectCharacter/{roomId}")
+    public void deselectCharacter(@DestinationVariable String roomId, ChatMessage chatMessage) {
         String sender = chatMessage.getSender();
         String characterSrc = chatMessage.getContent();
 
@@ -212,15 +200,29 @@ public class ChatController {
                         .build();
 
                 System.out.println("deselect: " + characterDeselectMessage);
-                messagingTemplate.convertAndSend("/topic/public", characterDeselectMessage);
+                messagingTemplate.convertAndSend("/topic/" + roomId, characterDeselectMessage);
             }
         }
     }
 
-    @MessageMapping("/chat.sendMessage")
-    @SendTo("/topic/public")
-    public ChatMessage sendMessage(ChatMessage chatMessage) {
+    @MessageMapping("/chat.sendMessage/{roomId}")
+    public void sendMessage(@DestinationVariable String roomId, ChatMessage chatMessage) {
         System.out.println("chatMessage: " + chatMessage);
-        return chatMessage;
+        messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
+    }
+
+    @MessageMapping("/chat.changeMap/{roomId}")
+    public void changeMap(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        roomMaps.put(roomId, chatMessage.getContent());
+
+        ChatMessage mapMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.CHANGE_MAP)
+                .content(chatMessage.getContent())
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
+
+        System.out.println("Map changed for room: " + roomId + " to " + chatMessage.getContent());
     }
 }
