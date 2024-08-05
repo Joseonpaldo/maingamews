@@ -19,6 +19,8 @@ public class ChatController {
     private static final int MAX_PLAYERS = 4;
     private Map<String, List<String>> roomPlayers = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
+    private Map<String, String> roomMaps = new HashMap<>(); // 방별 맵 정보 저장
+
 
     public ChatController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
@@ -47,7 +49,9 @@ public class ChatController {
             playerCharacters.put(roomId, charactersInRoom);
         }
 
-        // 입장 메시지 전송
+        // 맵 정보 포함하여 전송
+        String currentMap = roomMaps.getOrDefault(roomId, "/image/map/1.png");
+
         ChatMessage joinMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.JOIN)
                 .content(chatMessage.getSender() + " 님이 입장하였습니다.")
@@ -56,7 +60,7 @@ public class ChatController {
 
         messagingTemplate.convertAndSend("/topic/public", joinMessage);
 
-        // 기존 플레이어 정보 전송
+        // 기존 플레이어 정보 및 맵 정보 전송
         Map<String, String> charactersInRoom = playerCharacters.get(roomId);
         StringBuilder allPlayersInfo = new StringBuilder();
         for (String player : playersInRoom) {
@@ -74,6 +78,15 @@ public class ChatController {
                 .build();
 
         messagingTemplate.convertAndSend("/topic/public", newUserMessage);
+
+        // 맵 정보 전송
+        ChatMessage mapMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.CHANGE_MAP)
+                .content(currentMap)
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/public", mapMessage);
 
         System.out.println("room number: " + newUserMessage.getRoomId());
         System.out.println("Sending existing players: " + newUserMessage.getContent());
