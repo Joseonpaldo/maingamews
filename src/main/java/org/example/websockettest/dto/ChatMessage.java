@@ -27,6 +27,7 @@ public class ChatMessage {
         EXISTING_PLAYERS, // 추가
         DESELECT,
         CHANGE_MAP,
+        START,
         ERROR
     }
 

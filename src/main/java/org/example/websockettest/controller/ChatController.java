@@ -100,6 +100,7 @@ public class ChatController {
             roomPlayers.put(roomId, playersInRoom);
         }
 
+        // 플레이어 캐릭터 정보는 유지
         if (playerCharacters.containsKey(roomId)) {
             Map<String, String> charactersInRoom = playerCharacters.get(roomId);
             charactersInRoom.remove(sender);
@@ -137,6 +138,7 @@ public class ChatController {
 
         System.out.println("Sending existing players: " + String.join(",", playersInRoom));
     }
+
 
     @MessageMapping("/chat.ready/{roomId}")
     public void readyUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
@@ -225,4 +227,45 @@ public class ChatController {
 
         System.out.println("Map changed for room: " + roomId + " to " + chatMessage.getContent());
     }
+
+    @MessageMapping("/chat.startGame/{roomId}")
+    public void startGame(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
+        Map<String, String> charactersInRoom = playerCharacters.getOrDefault(roomId, new HashMap<>());
+        String currentMap = roomMaps.getOrDefault(roomId, "/image/map/1.png");
+
+        if (playersInRoom.size() == 0) {
+            ChatMessage errorMessage = ChatMessage.builder()
+                    .type(ChatMessage.MessageType.ERROR)
+                    .content("No players in the room")
+                    .roomId(roomId)
+                    .build();
+            messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
+            return;
+        }
+
+        // 게임 시작 정보 생성
+        StringBuilder gameInfo = new StringBuilder();
+        gameInfo.append("Room ID: ").append(roomId).append("\n");
+        gameInfo.append("Map: ").append(currentMap).append("\n");
+        gameInfo.append("Players:\n");
+
+        for (String player : playersInRoom) {
+            gameInfo.append(player).append(": ").append(charactersInRoom.get(player)).append("\n");
+        }
+
+        // 게임 시작 메시지 생성 및 전송
+        ChatMessage startMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.START)
+                .content(gameInfo.toString())
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
+
+        System.out.println("Game started for room: " + roomId);
+        System.out.println("Game info: " + gameInfo.toString());
+    }
+
+
 }
