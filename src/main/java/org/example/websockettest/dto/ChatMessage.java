@@ -28,7 +28,8 @@ public class ChatMessage {
         DESELECT,
         CHANGE_MAP,
         START,
-        ERROR
+        ERROR,
+        HEARTBEAT
     }
 
 }

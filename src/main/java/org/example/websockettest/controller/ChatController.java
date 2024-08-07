@@ -1,28 +1,59 @@
 package org.example.websockettest.controller;
 
 import org.example.websockettest.dto.ChatMessage;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-@Controller
+@RestController
 public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private static final int MAX_PLAYERS = 4;
+    private static final long TIMEOUT = 5000; // heart 초
     private Map<String, List<String>> roomPlayers = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
     private Map<String, String> roomMaps = new HashMap<>(); // 방별 맵 정보 저장
+    private Map<String, Long> playerHeartbeat = new ConcurrentHashMap<>();
 
 
     public ChatController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
+
+        // Heartbeat 체크 쓰레드
+        new Thread(() -> {
+            while (true) {
+                long currentTime = System.currentTimeMillis();
+                playerHeartbeat.forEach((player, lastHeartbeat) -> {
+                    if (currentTime - lastHeartbeat > TIMEOUT) {
+                        String roomId = getRoomIdByPlayer(player);
+                        if (roomId != null) {
+                            leaveUser(roomId, ChatMessage.builder()
+                                    .sender(player)
+                                    .type(ChatMessage.MessageType.LEAVE)
+                                    .roomId(roomId)
+                                    .build());
+                        }
+                    }
+                });
+                try {
+                    Thread.sleep(5000); // 5초마다 체크
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 
     @MessageMapping("/chat.addUser/{roomId}")
@@ -86,9 +117,19 @@ public class ChatController {
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
 
+        // 현재 선택된 캐릭터 목록 전송
+        ChatMessage selectedCharactersMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.UPDATE)
+                .content(allPlayersInfo.toString())
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/" + roomId, selectedCharactersMessage);
+
         System.out.println("room number: " + newUserMessage.getRoomId());
         System.out.println("Sending existing players: " + newUserMessage.getContent());
     }
+
 
     @MessageMapping("/chat.leaveUser/{roomId}")
     public void leaveUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
@@ -100,7 +141,7 @@ public class ChatController {
             roomPlayers.put(roomId, playersInRoom);
         }
 
-        // 플레이어 캐릭터 정보는 유지
+        // 플레이어 캐릭터 초기화
         if (playerCharacters.containsKey(roomId)) {
             Map<String, String> charactersInRoom = playerCharacters.get(roomId);
             charactersInRoom.remove(sender);
@@ -139,6 +180,11 @@ public class ChatController {
         System.out.println("Sending existing players: " + String.join(",", playersInRoom));
     }
 
+
+    @MessageMapping("/chat.heartbeat/{roomId}")
+    public void receiveHeartbeat(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        playerHeartbeat.put(chatMessage.getSender(), System.currentTimeMillis());
+    }
 
     @MessageMapping("/chat.ready/{roomId}")
     public void readyUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
@@ -267,5 +313,21 @@ public class ChatController {
         System.out.println("Game info: " + gameInfo.toString());
     }
 
+    @GetMapping("/room/{roomId}/status")
+    public ResponseEntity<Map<String, Object>> getRoomStatus(@PathVariable String roomId) {
+        Map<String, Object> roomStatus = new HashMap<>();
+        roomStatus.put("players", roomPlayers.getOrDefault(roomId, new ArrayList<>()));
+        roomStatus.put("characters", playerCharacters.getOrDefault(roomId, new HashMap<>()));
+        roomStatus.put("map", roomMaps.getOrDefault(roomId, "/image/map/1.png"));
+        return ResponseEntity.ok(roomStatus);
+    }
 
+    private String getRoomIdByPlayer(String playerName) {
+        for (Map.Entry<String, List<String>> entry : roomPlayers.entrySet()) {
+            if (entry.getValue().contains(playerName)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
 }
