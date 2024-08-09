@@ -29,6 +29,9 @@ public class ChatMessage {
         CHANGE_MAP,
         START,
         ERROR,
+        START_GAME,
+        FINISH_RACE,
+        UPDATE_SPEED,
         HEARTBEAT
     }
 

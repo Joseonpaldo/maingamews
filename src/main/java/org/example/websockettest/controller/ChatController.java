@@ -10,11 +10,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @RestController
 public class ChatController {
@@ -127,7 +125,7 @@ public class ChatController {
         messagingTemplate.convertAndSend("/topic/" + roomId, selectedCharactersMessage);
 
         System.out.println("room number: " + newUserMessage.getRoomId());
-        System.out.println("Sending existing players: " + newUserMessage.getContent());
+//        System.out.println("Sending existing players: " + newUserMessage.getContent());
     }
 
 
@@ -177,7 +175,7 @@ public class ChatController {
         // 업데이트된 플레이어 정보 전송
         messagingTemplate.convertAndSend("/topic/" + roomId, updateUserMessage);
 
-        System.out.println("Sending existing players: " + String.join(",", playersInRoom));
+//        System.out.println("Sending existing players: " + String.join(",", playersInRoom));
     }
 
 
@@ -224,7 +222,7 @@ public class ChatController {
                     .roomId(roomId)
                     .build();
 
-            System.out.println("character selected: " + characterSelectMessage);
+//            System.out.println("character selected: " + characterSelectMessage);
             messagingTemplate.convertAndSend("/topic/" + roomId, characterSelectMessage);
         }
     }
@@ -247,7 +245,7 @@ public class ChatController {
                         .roomId(roomId)
                         .build();
 
-                System.out.println("deselect: " + characterDeselectMessage);
+//                System.out.println("deselect: " + characterDeselectMessage);
                 messagingTemplate.convertAndSend("/topic/" + roomId, characterDeselectMessage);
             }
         }
@@ -255,7 +253,7 @@ public class ChatController {
 
     @MessageMapping("/chat.sendMessage/{roomId}")
     public void sendMessage(@DestinationVariable String roomId, ChatMessage chatMessage) {
-        System.out.println("chatMessage: " + chatMessage);
+//        System.out.println("chatMessage: " + chatMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
     }
 
@@ -271,7 +269,7 @@ public class ChatController {
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
 
-        System.out.println("Map changed for room: " + roomId + " to " + chatMessage.getContent());
+//        System.out.println("Map changed for room: " + roomId + " to " + chatMessage.getContent());
     }
 
     @MessageMapping("/chat.startGame/{roomId}")
@@ -280,7 +278,7 @@ public class ChatController {
         Map<String, String> charactersInRoom = playerCharacters.getOrDefault(roomId, new HashMap<>());
         String currentMap = roomMaps.getOrDefault(roomId, "/image/map/1.png");
 
-        if (playersInRoom.size() == 0) {
+        if (playersInRoom.isEmpty()) {
             ChatMessage errorMessage = ChatMessage.builder()
                     .type(ChatMessage.MessageType.ERROR)
                     .content("No players in the room")
@@ -290,28 +288,42 @@ public class ChatController {
             return;
         }
 
-        // 게임 시작 정보 생성
+        // 각 플레이어에게 랜덤 속도 할당
+        Map<String, Integer> playerSpeeds = new HashMap<>();
+        Random random = new Random();
+        for (String player : playersInRoom) {
+            playerSpeeds.put(player, random.nextInt(30) + 1); // 1~10 사이의 속도
+        }
+
+        // 서버에서 계산된 순위 정보를 포함하여 클라이언트로 전송
+        List<Map.Entry<String, Integer>> sortedPlayers = playerSpeeds.entrySet()
+                .stream()
+                .sorted((entry1, entry2) -> entry2.getValue().compareTo(entry1.getValue())) // 역순으로 정렬
+                .collect(Collectors.toList());
+
         StringBuilder gameInfo = new StringBuilder();
         gameInfo.append("Room ID: ").append(roomId).append("\n");
         gameInfo.append("Map: ").append(currentMap).append("\n");
         gameInfo.append("Players:\n");
 
-        for (String player : playersInRoom) {
-            gameInfo.append(player).append(": ").append(charactersInRoom.get(player)).append("\n");
+        int rank = 1;
+        for (Map.Entry<String, Integer> entry : sortedPlayers) {
+            gameInfo.append(rank).append(". ").append(entry.getKey())
+                    .append(": ").append(charactersInRoom.get(entry.getKey()))
+                    .append(", Speed: ").append(entry.getValue()).append("\n");
+            rank++;
         }
 
-        // 게임 시작 메시지 생성 및 전송
         ChatMessage startMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.START)
                 .content(gameInfo.toString())
                 .roomId(roomId)
                 .build();
 
+        System.out.println(startMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
-
-        System.out.println("Game started for room: " + roomId);
-        System.out.println("Game info: " + gameInfo.toString());
     }
+
 
     @GetMapping("/room/{roomId}/status")
     public ResponseEntity<Map<String, Object>> getRoomStatus(@PathVariable String roomId) {
