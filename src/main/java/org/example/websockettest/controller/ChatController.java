@@ -292,7 +292,7 @@ public class ChatController {
         Map<String, Integer> playerSpeeds = new HashMap<>();
         Random random = new Random();
         for (String player : playersInRoom) {
-            playerSpeeds.put(player, random.nextInt(30) + 1); // 1~10 사이의 속도
+            playerSpeeds.put(player, random.nextInt(30) + 1); // 1~30 사이의 속도
         }
 
         // 서버에서 계산된 순위 정보를 포함하여 클라이언트로 전송
@@ -320,8 +320,7 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
-        System.out.println(startMessage);
-        messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, startMessage); // 모든 클라이언트로 전송
     }
 
 
