@@ -117,4 +117,3 @@ jobs:
           ./ncloud vserver removeAccessControlGroupInboundRule --regionCode KR --vpcNo ${{ secrets.NAVER_VPC }} --accessControlGroupNo ${{ secrets.NAVER_ACG_NO2 }} --accessControlGroupRuleList "protocolTypeCode='TCP', ipBlock='${{ env.PUBLIC_IP }}/32', portRange='3306'"
           sleep 10
           ./ncloud vserver removeAccessControlGroupOutboundRule --regionCode KR --vpcNo ${{ secrets.NAVER_VPC }} --accessControlGroupNo ${{ secrets.NAVER_ACG_NO2 }} --accessControlGroupRuleList "protocolTypeCode='TCP', ipBlock='${{ env.PUBLIC_IP }}/32', portRange='3306'"
-
