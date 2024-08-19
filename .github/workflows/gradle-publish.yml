@@ -89,7 +89,7 @@ jobs:
             docker pull ${{ secrets.REGISTRY_URL }}/joseonpaldo-ws:${{ env.COMMIT_HASH }}
             docker stop joseonpaldo-ws || true
             docker rm joseonpaldo-ws || true
-            docker run -d -p 8080:8080 --name joseonpaldo-ws ${{ secrets.REGISTRY_URL }}/joseonpaldo-ws:${{ env.COMMIT_HASH }}
+            docker run -d -p 8081:8081 --name joseonpaldo-ws ${{ secrets.REGISTRY_URL }}/joseonpaldo-ws:${{ env.COMMIT_HASH }}
             docker images --format '{{.Repository}}:{{.Tag}}' | grep joseonpaldo-ws | grep -v "${{ env.COMMIT_HASH }}" | xargs -r docker rmi || true
 
       - name: Wait for 90sec
@@ -106,7 +106,7 @@ jobs:
             docker pull ${{ secrets.REGISTRY_URL }}/joseonpaldo-ws:${{ env.COMMIT_HASH }}
             docker stop joseonpaldo-ws || true
             docker rm joseonpaldo-ws || true
-            docker run -d -p 8080:8080 --name joseonpaldo-ws ${{ secrets.REGISTRY_URL }}/joseonpaldo-ws:${{ env.COMMIT_HASH }}
+            docker run -d -p 8081:8081 --name joseonpaldo-ws ${{ secrets.REGISTRY_URL }}/joseonpaldo-ws:${{ env.COMMIT_HASH }}
             docker images --format '{{.Repository}}:{{.Tag}}' | grep joseonpaldo-ws | grep -v "${{ env.COMMIT_HASH }}" | xargs -r docker rmi || true
       
       - name: Remove ACG inbound rule created
