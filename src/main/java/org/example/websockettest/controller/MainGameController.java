@@ -5,11 +5,13 @@ import org.example.websockettest.dto.Location;
 import org.example.websockettest.dto.Player;
 import org.example.websockettest.dto.SendMessage;
 import org.json.simple.JSONObject;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.util.*;
 
@@ -21,6 +23,7 @@ public class MainGameController {
     public Map<String, List<Player>> players = new HashMap<>();
     public Map<String, Integer> currentOrder = new HashMap<>();
     public Map<String, Boolean> currentThrow = new HashMap<>();
+    public Map<String, String> sessionRoomId = new HashMap<>();
 
     public Player player1 = Player.builder()
             .name("플레이어1임")
@@ -65,6 +68,12 @@ public class MainGameController {
     List<Player> playerList = Arrays.asList(player1, player2, player3, player4);
 
 
+//    @EventListener
+//    public void handleWebSocketConnectListener(SessionConnectedEvent event) {
+//        System.out.println(event.getMessage().getHeaders().get("simpSessionId"));
+//        System.out.println("웹소켓 연결");
+//    }
+
     public MainGameController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
         players.put("adsadvkjwi", playerList);
@@ -76,9 +85,32 @@ public class MainGameController {
         yutResult.get(roomId).remove(index);
     }
 
-    @MessageMapping("/main/join/{roomId}")
-    public void handleGameMessage(@DestinationVariable String roomId, @Header String name) {
+    @EventListener
+    public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
+        String sessionId = (String) event.getMessage().getHeaders().get("simpSessionId");
+        String roomId = sessionRoomId.get(sessionId);
+
+        for (Player player : players.get(roomId)) {
+            if (player.getSessionId().equals(sessionId)) {
+                player.setSessionId("");
+            }
+        }
+
+        sessionRoomId.remove(sessionId);
         sendPlayerInfo(roomId);
+    }
+
+    @MessageMapping("/main/join/{roomId}")
+    public void handleGameMessage(@DestinationVariable String roomId, @Header String name, @Header String sessionId) {
+        sessionRoomId.put(sessionId, roomId);
+        for (Player player : players.get(roomId)) {
+            if (player.getPlayer().equals(name)) {
+                player.setSessionId(sessionId);
+                sendPlayerInfo(roomId);
+                return;
+            }
+        }
+
     }
 
     @MessageMapping("/main/throwYut/{roomId}")
@@ -137,7 +169,7 @@ public class MainGameController {
                     int go = (item + 39);
                     displayIndex2 = go;
                     if (go == 43) {
-                        displayIndex1 = 100;
+                        displayIndex2 = 100;
                     }
                 }
 
@@ -241,10 +273,10 @@ public class MainGameController {
                 player.setMyTurn(true);
             }
         }
-        System.out.println("NOW order : " + nextTurn);
-        for (Player player : players.get(roomId)) {
-            System.out.println(player.getName() + " : " + player.isMyTurn());
-        }
+//        System.out.println("NOW order : " + nextTurn);
+//        for (Player player : players.get(roomId)) {
+//            System.out.println(player.getName() + " : " + player.isMyTurn());
+//        }
         sendPlayerInfo(roomId);
     }
 
