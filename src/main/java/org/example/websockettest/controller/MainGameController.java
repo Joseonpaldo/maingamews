@@ -113,10 +113,12 @@ public class MainGameController {
                 //중앙에 있을 시
                 if (player.getLocation() == 100) {
                     int go1 = (33 + item);
+                    displayIndex1 = go1;
                     if (go1 > 36) {
                         displayIndex1 = go1 - 36 + 17;
                     }
                     int go2 = (43 + item);
+                    displayIndex2 = go2;
                     if (go2 > 46) {
                         displayIndex2 = go2 - 47;
                     }
