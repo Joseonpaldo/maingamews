@@ -18,4 +18,5 @@ public class Player {
     private int order;
     private boolean myTurn;
     private List<Location> estate;
+    private String SessionId = "";
 }
