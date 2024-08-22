@@ -13,6 +13,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
+import java.net.HttpURLConnection;
 import java.util.*;
 
 @Controller
@@ -91,7 +92,7 @@ public class MainGameController {
         String roomId = sessionRoomId.get(sessionId);
 
         for (Player player : players.get(roomId)) {
-            if (player.getSessionId().equals(sessionId)) {
+            if (player.getSessionId() != null && player.getSessionId().equals(sessionId)) {
                 player.setSessionId("");
             }
         }
@@ -110,7 +111,6 @@ public class MainGameController {
                 return;
             }
         }
-
     }
 
     @MessageMapping("/main/throwYut/{roomId}")
@@ -273,10 +273,6 @@ public class MainGameController {
                 player.setMyTurn(true);
             }
         }
-//        System.out.println("NOW order : " + nextTurn);
-//        for (Player player : players.get(roomId)) {
-//            System.out.println(player.getName() + " : " + player.isMyTurn());
-//        }
         sendPlayerInfo(roomId);
     }
 
