@@ -1,7 +1,7 @@
 server:
   port: 8081
 
-secret-key: aXUn65uFz2EpXEmTImZOf91NSPLlKvAd6Z8Ck6r9F4kQ9Q78r6dQx1m+XHzkB1Z5
+secret-key: ${JWT_SECRET_KEY}
 
 spring:
   application:
