@@ -1,9 +1,12 @@
 package org.example.websockettest.controller;
 
 import com.google.gson.Gson;
+import lombok.RequiredArgsConstructor;
 import org.example.websockettest.dto.Location;
 import org.example.websockettest.dto.Player;
 import org.example.websockettest.dto.SendMessage;
+import org.example.websockettest.entity.GameDataEntity;
+import org.example.websockettest.repository.GameDataRepositoryImpl;
 import org.json.simple.JSONObject;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -11,15 +14,17 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-import java.net.HttpURLConnection;
 import java.util.*;
 
 @Controller
+@RequiredArgsConstructor
 public class MainGameController {
-
     public static Map<String, List<Integer>> yutResult = new HashMap<>();
+    final private GameDataRepositoryImpl gameDataRepository;
     private final SimpMessagingTemplate messagingTemplate;
     public Map<String, List<Player>> players = new HashMap<>();
     public Map<String, Integer> currentOrder = new HashMap<>();
@@ -75,13 +80,6 @@ public class MainGameController {
 //        System.out.println("웹소켓 연결");
 //    }
 
-    public MainGameController(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
-        players.put("adsadvkjwi", playerList);
-        currentOrder.put("adsadvkjwi", 1);
-        currentThrow.put("adsadvkjwi", true);
-    }
-
     public static void resultDelete(int index, String roomId) {
         yutResult.get(roomId).remove(index);
     }
@@ -90,8 +88,18 @@ public class MainGameController {
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         String sessionId = (String) event.getMessage().getHeaders().get("simpSessionId");
         String roomId = sessionRoomId.get(sessionId);
-
-        for (Player player : players.get(roomId)) {
+        try {
+            var getPlayerData = players.get(roomId);
+            for (Player player : getPlayerData) {
+                if (player.getSessionId() != null && player.getSessionId().equals(sessionId)) {
+                    player.setSessionId("");
+                }
+            }
+        } catch (NullPointerException e) {
+            newPlayerDataPush(roomId);
+        }
+        var getPlayerData = players.get(roomId);
+        for (Player player : getPlayerData) {
             if (player.getSessionId() != null && player.getSessionId().equals(sessionId)) {
                 player.setSessionId("");
             }
@@ -101,10 +109,28 @@ public class MainGameController {
         sendPlayerInfo(roomId);
     }
 
+    @GetMapping("/web/main/{roomId}")
+    public String start(@PathVariable String roomId) {
+        System.out.println(roomId);
+        messagingTemplate.convertAndSend("/topic/main/start/" + roomId);
+        return "ok";
+    }
+
+    @MessageMapping("/main/start/{roomId}")
+    public void mainGameStartHandle(@DestinationVariable String roomId) {
+        newPlayerDataPush(roomId);
+    }
+
     @MessageMapping("/main/join/{roomId}")
     public void handleGameMessage(@DestinationVariable String roomId, @Header String name, @Header String sessionId) {
         sessionRoomId.put(sessionId, roomId);
-        for (Player player : players.get(roomId)) {
+        var getPlayers = players.get(roomId);
+        if (getPlayers == null) {
+            SendMessage send = SendMessage.builder().Type("error").Message("not found room").build();
+            messagingTemplate.convertAndSend("/topic/main-game/" + roomId, send);
+            return;
+        }
+        for (Player player : getPlayers) {
             if (player.getPlayer().equals(name)) {
                 player.setSessionId(sessionId);
                 sendPlayerInfo(roomId);
@@ -298,6 +324,32 @@ public class MainGameController {
         }
         SendMessage isThrow = SendMessage.builder().Type("isThrow").Message(currentThrow.get(roomId).toString()).build();
         messagingTemplate.convertAndSend("/topic/main-game/" + roomId, isThrow);
+    }
+
+    public void newPlayerDataPush(String roomId) {
+        List<Player> playerList = new ArrayList<>();
+        var data = gameDataRepository.findAllByRoomId(Long.valueOf(roomId));
+        for (GameDataEntity gameData : data) {
+            Player player = Player.builder()
+                    .name(gameData.getUser().getNickname())
+                    .player("player" + gameData.getMy_turn())
+                    .avatar(gameData.getAvatar())
+                    .profile(gameData.getUser().getProfilePicture())
+                    .money(gameData.getMoney())
+                    .location(gameData.getUser_location())
+                    .order(gameData.getMy_turn())
+                    .myTurn(false)
+                    .build();
+            if (gameData.getMy_turn() == 1) {
+                player.setMyTurn(true);
+            }
+            playerList.add(player);
+        }
+        players.put(roomId, playerList);
+        currentOrder.put(roomId, 1);
+        currentThrow.put(roomId, true);
+
+        System.out.println(playerList);
     }
 
 }

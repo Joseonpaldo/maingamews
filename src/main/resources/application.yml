@@ -1,0 +1,24 @@
+server:
+  port: 8081
+
+secret-key: aXUn65uFz2EpXEmTImZOf91NSPLlKvAd6Z8Ck6r9F4kQ9Q78r6dQx1m+XHzkB1Z5
+
+spring:
+  application:
+    name: joseonpaldo
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://db-n9jfu-kr.vpc-pub-cdb.ntruss.com:3306/joseonpaldo
+    username: joseonpaldo
+    password: bitcamp!@#123
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true    
+    show-sql: true
+    database: mysql 
+    database-platform: org.hibernate.dialect.MySQLDialect
+
+
+

@@ -24,11 +24,15 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'io.github.cdimascio:dotenv-java:2.2.0'
 //    웹소캣
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
@@ -36,6 +40,7 @@ dependencies {
     implementation 'org.json:json:20180130'
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
     implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+
 
 }
 
