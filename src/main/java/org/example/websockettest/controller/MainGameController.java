@@ -7,8 +7,11 @@ import org.example.websockettest.dto.Player;
 import org.example.websockettest.dto.SendMessage;
 import org.example.websockettest.entity.GameDataEntity;
 import org.example.websockettest.repository.GameDataRepositoryImpl;
+import org.example.websockettest.repository.UserRepositoryImpl;
 import org.json.simple.JSONObject;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -26,6 +29,9 @@ public class MainGameController {
     public static Map<String, List<Integer>> yutResult = new HashMap<>();
     final private GameDataRepositoryImpl gameDataRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepositoryImpl userRepository;
+
+
     public Map<String, List<Player>> players = new HashMap<>();
     public Map<String, Integer> currentOrder = new HashMap<>();
     public Map<String, Boolean> currentThrow = new HashMap<>();
@@ -109,11 +115,11 @@ public class MainGameController {
         sendPlayerInfo(roomId);
     }
 
-    @GetMapping("/web/main/{roomId}")
-    public String start(@PathVariable String roomId) {
-        System.out.println(roomId);
-        messagingTemplate.convertAndSend("/topic/main/start/" + roomId);
-        return "ok";
+    @GetMapping("/ws/api/test/{userId}")
+    public ResponseEntity start(@PathVariable String userId) {
+        var data = userRepository.findById(Long.valueOf(userId)).get();
+
+        return ResponseEntity.ok(data);
     }
 
     @MessageMapping("/main/start/{roomId}")
