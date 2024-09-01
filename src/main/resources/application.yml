@@ -8,9 +8,9 @@ spring:
     name: joseonpaldo
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://db-n9jfu-kr.vpc-pub-cdb.ntruss.com:3306/joseonpaldo
-    username: joseonpaldo
-    password: bitcamp!@#123
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
