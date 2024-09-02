@@ -207,6 +207,7 @@ public class ChatController {
         List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
         Map<String, String> charactersInRoom = playerCharacters.getOrDefault(roomId, new HashMap<>());
         String currentMap = roomMaps.getOrDefault(roomId, "/image/map/1.png");
+
         if (playersInRoom.isEmpty()) {
             ChatMessage errorMessage = ChatMessage.builder()
                     .type(ChatMessage.MessageType.ERROR)
@@ -216,30 +217,25 @@ public class ChatController {
             messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
             return;
         }
+
         // 각 플레이어에게 랜덤 속도 할당
         Map<String, Integer> playerSpeeds = new HashMap<>();
         Random random = new Random();
         for (String player : playersInRoom) {
-            playerSpeeds.put(player, random.nextInt(30) + 1); // 1~10 사이의 속도
             playerSpeeds.put(player, random.nextInt(30) + 1); // 1~30 사이의 속도
         }
 
-        // 서버에서 계산된 순위 정보를 포함하여 클라이언트로 전송
-        List<Map.Entry<String, Integer>> sortedPlayers = playerSpeeds.entrySet()
-                .stream()
-                .sorted((entry1, entry2) -> entry2.getValue().compareTo(entry1.getValue())) // 역순으로 정렬
-                .collect(Collectors.toList());
+        // 서버에서 순위를 정하지 않고 속도 정보만 클라이언트로 전송
         StringBuilder gameInfo = new StringBuilder();
         gameInfo.append("Room ID: ").append(roomId).append("\n");
         gameInfo.append("Map: ").append(currentMap).append("\n");
         gameInfo.append("Players:\n");
-        int rank = 1;
-        for (Map.Entry<String, Integer> entry : sortedPlayers) {
-            gameInfo.append(rank).append(". ").append(entry.getKey())
+        for (Map.Entry<String, Integer> entry : playerSpeeds.entrySet()) {
+            gameInfo.append(entry.getKey())
                     .append(": ").append(charactersInRoom.get(entry.getKey()))
                     .append(", Speed: ").append(entry.getValue()).append("\n");
-            rank++;
         }
+
         ChatMessage startMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.START)
                 .content(gameInfo.toString())
@@ -249,6 +245,7 @@ public class ChatController {
         System.out.println(startMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
     }
+
 
 
     @GetMapping("/room/{roomId}/status")
