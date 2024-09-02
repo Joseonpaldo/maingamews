@@ -37,48 +37,6 @@ public class MainGameController {
     public Map<String, Boolean> currentThrow = new HashMap<>();
     public Map<String, String> sessionRoomId = new HashMap<>();
 
-    public Player player1 = Player.builder()
-            .name("플레이어1임")
-            .player("player1")
-            .avatar("bear")
-            .profile("/assets/avatar-1.png")
-            .money(5000)
-            .location(0)
-            .order(1)
-            .myTurn(true)
-            .build();
-    public Player player2 = Player.builder()
-            .name("플레이어2임~")
-            .player("player2")
-            .avatar("panda")
-            .profile("/assets/avatar-2.png")
-            .money(2311)
-            .location(15)
-            .order(2)
-            .myTurn(false)
-            .build();
-    public Player player4 = Player.builder()
-            .name("플레이어4임~")
-            .player("player4")
-            .avatar("monkey")
-            .profile("/assets/avatar-3.png")
-            .money(1555)
-            .location(22)
-            .order(4)
-            .myTurn(false)
-            .build();
-    public Player player3 = Player.builder()
-            .name("플레이어3임~")
-            .player("player3")
-            .avatar("rabbit")
-            .profile("/assets/avatar-6.png")
-            .money(5010)
-            .location(5)
-            .order(3)
-            .myTurn(false)
-            .build();
-    List<Player> playerList = Arrays.asList(player1, player2, player3, player4);
-
 
 //    @EventListener
 //    public void handleWebSocketConnectListener(SessionConnectedEvent event) {
@@ -94,15 +52,9 @@ public class MainGameController {
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         String sessionId = (String) event.getMessage().getHeaders().get("simpSessionId");
         String roomId = sessionRoomId.get(sessionId);
-        try {
-            var getPlayerData = players.get(roomId);
-            for (Player player : getPlayerData) {
-                if (player.getSessionId() != null && player.getSessionId().equals(sessionId)) {
-                    player.setSessionId("");
-                }
-            }
-        } catch (NullPointerException e) {
-            newPlayerDataPush(roomId);
+        System.out.println("끊김 roomId: " + roomId + " sessionId: " + sessionId);
+        if (roomId == null || roomId.isEmpty()) {
+            return;
         }
         var getPlayerData = players.get(roomId);
         for (Player player : getPlayerData) {
@@ -115,13 +67,6 @@ public class MainGameController {
         sendPlayerInfo(roomId);
     }
 
-    @GetMapping("/ws/api/test/{userId}")
-    public ResponseEntity start(@PathVariable String userId) {
-        var data = userRepository.findById(Long.valueOf(userId)).get();
-
-        return ResponseEntity.ok(data);
-    }
-
     @MessageMapping("/main/start/{roomId}")
     public void mainGameStartHandle(@DestinationVariable String roomId) {
         newPlayerDataPush(roomId);
@@ -129,9 +74,11 @@ public class MainGameController {
 
     @MessageMapping("/main/join/{roomId}")
     public void handleGameMessage(@DestinationVariable String roomId, @Header String name, @Header String sessionId) {
+        System.out.println("join " + name + " " + sessionId + " " + roomId);
         sessionRoomId.put(sessionId, roomId);
         var getPlayers = players.get(roomId);
         if (getPlayers == null) {
+            System.out.println("join > roomId is null");
             SendMessage send = SendMessage.builder().Type("error").Message("not found room").build();
             messagingTemplate.convertAndSend("/topic/main-game/" + roomId, send);
             return;
@@ -333,20 +280,21 @@ public class MainGameController {
     }
 
     public void newPlayerDataPush(String roomId) {
+        System.out.println("newPlayerDataPush room id : " + roomId);
         List<Player> playerList = new ArrayList<>();
         var data = gameDataRepository.findAllByRoomId(Long.valueOf(roomId));
         for (GameDataEntity gameData : data) {
             Player player = Player.builder()
                     .name(gameData.getUser().getNickname())
-                    .player("player" + gameData.getMy_turn())
+                    .player("player" + gameData.getMyTurn())
                     .avatar(gameData.getAvatar())
                     .profile(gameData.getUser().getProfilePicture())
-                    .money(gameData.getMoney())
-                    .location(gameData.getUser_location())
-                    .order(gameData.getMy_turn())
+                    .money(gameData.getGameRoom().getBudget())
+                    .location(0)
+                    .order(gameData.getMyTurn())
                     .myTurn(false)
                     .build();
-            if (gameData.getMy_turn() == 1) {
+            if (gameData.getMyTurn() == 1) {
                 player.setMyTurn(true);
             }
             playerList.add(player);
