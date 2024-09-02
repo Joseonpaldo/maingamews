@@ -7,6 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
 public interface GameDataRepositoryImpl extends JpaRepository<GameDataEntity, Long> {
-    @Query("SELECT g FROM GameDataEntity g WHERE g.gameRoom.room_id = :roomId")
+    @Query("SELECT g FROM GameDataEntity g WHERE g.gameRoom.roomId = :roomId")
     List<GameDataEntity> findAllByRoomId(Long roomId);
 }
