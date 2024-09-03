@@ -1,26 +1,28 @@
 package org.example.websockettest.controller;
 
 import com.google.gson.Gson;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.example.websockettest.dto.Location;
-import org.example.websockettest.dto.Player;
-import org.example.websockettest.dto.SendMessage;
+import org.example.websockettest.dto.*;
 import org.example.websockettest.entity.GameDataEntity;
+import org.example.websockettest.entity.GameLogEntity;
+import org.example.websockettest.entity.GameRoomEntity;
+import org.example.websockettest.entity.UserEntity;
 import org.example.websockettest.repository.GameDataRepositoryImpl;
+import org.example.websockettest.repository.GameLogRepositoryImpl;
+import org.example.websockettest.repository.GameRoomRepositoryImpl;
 import org.example.websockettest.repository.UserRepositoryImpl;
 import org.json.simple.JSONObject;
 import org.springframework.context.event.EventListener;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
+import java.sql.Timestamp;
 import java.util.*;
 
 @Controller
@@ -28,14 +30,20 @@ import java.util.*;
 public class MainGameController {
     public static Map<String, List<Integer>> yutResult = new HashMap<>();
     final private GameDataRepositoryImpl gameDataRepository;
+    private final GameLogRepositoryImpl gameLogRepository;
     private final SimpMessagingTemplate messagingTemplate;
-    private final UserRepositoryImpl userRepository;
+    private final UserRepositoryImpl userRepositoryImpl;
+    private final GameRoomRepositoryImpl gameRoomRepositoryImpl;
 
 
     public Map<String, List<Player>> players = new HashMap<>();
+    public Map<String, List<MainGameChatLogDto>> chatLogs = new HashMap<>();
+    public Map<String, List<MainGameLoggingDto>> gameLogs = new HashMap<>();
     public Map<String, Integer> currentOrder = new HashMap<>();
     public Map<String, Boolean> currentThrow = new HashMap<>();
     public Map<String, String> sessionRoomId = new HashMap<>();
+
+    Gson gson = new Gson();
 
 
 //    @EventListener
@@ -255,6 +263,53 @@ public class MainGameController {
         sendPlayerInfo(roomId);
     }
 
+    @MessageMapping("/main/chatLog/join/{roomId}")
+    public void joinLog(@DestinationVariable String roomId) {
+        System.out.println("join ");
+        List<MainGameChatLogDto> chatLogList = chatLogs.get(roomId);
+        if (chatLogList != null) {
+            SendMessage chatLogMessage = SendMessage.builder().Type("chatLog").Message(gson.toJson(chatLogList)).build();
+            messagingTemplate.convertAndSend("/topic/main-game/log/" + roomId, chatLogMessage);
+        }
+
+        List<MainGameLoggingDto> gameLogList = gameLogs.get(roomId);
+        if (gameLogList == null) {
+            gameLogList = new ArrayList<>();
+        }
+        MainGameLoggingDto joinLog =  MainGameLoggingDto.builder().timestamp(new Timestamp(new Date().getTime())).message("입장").build();
+        gameLogList.add(joinLog);
+        gameLogs.put(String.valueOf(roomId), gameLogList);
+
+        SendMessage gameLogMessage = SendMessage.builder().Type("gameLog").Message(gson.toJson(gameLogList)).build();
+        messagingTemplate.convertAndSend("/topic/main-game/log/" + roomId, gameLogMessage);
+    }
+
+    @MessageMapping("/main/chatLog/{roomId}")
+    public void chatLog(@DestinationVariable String roomId, @Header String name, @Payload String message) {
+        MainGameChatLogDto chatLogDto = new MainGameChatLogDto();
+
+        // 스트림을 사용하여 플레이어 찾기
+        Optional<Player> optionalPlayer = players.get(roomId).stream()
+                .filter(player -> player.getPlayer().equals(name))
+                .findFirst();
+        optionalPlayer.ifPresent(chatLogDto::setPlayer); // 플레이어가 존재하면 설정
+
+        System.out.println(message);
+        chatLogDto.setMessage(message);
+        chatLogDto.setTimestamp(new Timestamp(new Date().getTime()));
+
+        List<MainGameChatLogDto> chatLogList = chatLogs.get(roomId);
+        if (chatLogList == null) {
+            chatLogList = new ArrayList<>();
+        }
+        chatLogList.add(chatLogDto);
+
+        chatLogs.put(roomId, chatLogList);
+
+        SendMessage chatLogMessage = SendMessage.builder().Type("chatLog").Message(gson.toJson(chatLogDto)).build();
+        messagingTemplate.convertAndSend("/topic/main-game/log/" + roomId, chatLogMessage);
+    }
+
 
     public int throwYut() {
         int[] result = {1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 2};
@@ -280,17 +335,22 @@ public class MainGameController {
     }
 
     public void newPlayerDataPush(String roomId) {
+        var findPlayer = players.get(roomId);
+        if (findPlayer != null) {
+            return;
+        }
         System.out.println("newPlayerDataPush room id : " + roomId);
         List<Player> playerList = new ArrayList<>();
         var data = gameDataRepository.findAllByRoomId(Long.valueOf(roomId));
         for (GameDataEntity gameData : data) {
             Player player = Player.builder()
+                    .userId(gameData.getUser().getUserId())
                     .name(gameData.getUser().getNickname())
-                    .player("player" + gameData.getMyTurn())
-                    .avatar(gameData.getAvatar())
                     .profile(gameData.getUser().getProfilePicture())
-                    .money(gameData.getGameRoom().getBudget())
                     .location(0)
+                    .money(gameData.getGameRoom().getBudget())
+                    .avatar(gameData.getAvatar())
+                    .player("player" + gameData.getMyTurn())
                     .order(gameData.getMyTurn())
                     .myTurn(false)
                     .build();
@@ -305,6 +365,36 @@ public class MainGameController {
 
         System.out.println(playerList);
     }
+
+    public void mainGameLogging(Long roomId, String message) {
+        MainGameLoggingDto mainGameLoggingDto = new MainGameLoggingDto();
+        mainGameLoggingDto.setMessage(message);
+        mainGameLoggingDto.setTimestamp(new Timestamp(new Date().getTime()));
+
+        List<MainGameLoggingDto> gameLogList = gameLogs.get(roomId.toString());
+        gameLogList.add(mainGameLoggingDto);
+        gameLogs.put(String.valueOf(roomId), gameLogList);
+
+        SendMessage gameLogMessage = SendMessage.builder().Type("gameLog").Message(mainGameLoggingDto.toString()).build();
+        messagingTemplate.convertAndSend("/topic/main-game/log/" + roomId, gameLogMessage);
+    }
+
+
+    @Transactional
+    public void saveGameLog(Long userId, Long roomId, int type, String message) {
+        UserEntity user = userRepositoryImpl.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(roomId).orElseThrow(() -> new RuntimeException("Room not found"));
+
+        GameLogEntity gameLog = GameLogEntity.builder()
+                .user(user)
+                .gameRoom(gameRoom)
+                .type(type)
+                .message(message)
+                .build();
+
+        gameLogRepository.save(gameLog);
+    }
+
 
 }
 
