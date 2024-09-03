@@ -19,39 +19,12 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private static final int MAX_PLAYERS = 4;
-    private static final long TIMEOUT = 5000; // heart 초
     private Map<String, List<String>> roomPlayers = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
     private Map<String, String> roomMaps = new HashMap<>(); // 방별 맵 정보 저장
-    private Map<String, Long> playerHeartbeat = new ConcurrentHashMap<>();
-
 
     public ChatController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
-
-        // Heartbeat 체크 쓰레드
-        new Thread(() -> {
-            while (true) {
-                long currentTime = System.currentTimeMillis();
-                playerHeartbeat.forEach((player, lastHeartbeat) -> {
-                    if (currentTime - lastHeartbeat > TIMEOUT) {
-                        String roomId = getRoomIdByPlayer(player);
-                        if (roomId != null) {
-                            leaveUser(roomId, ChatMessage.builder()
-                                    .sender(player)
-                                    .type(ChatMessage.MessageType.LEAVE)
-                                    .roomId(roomId)
-                                    .build());
-                        }
-                    }
-                });
-                try {
-                    Thread.sleep(5000); // 5초마다 체크
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
     }
 
     @MessageMapping("/chat.addUser/{roomId}")
@@ -72,22 +45,12 @@ public class ChatController {
             roomPlayers.put(roomId, playersInRoom);
 
             Map<String, String> charactersInRoom = playerCharacters.getOrDefault(roomId, new HashMap<>());
-            charactersInRoom.put(chatMessage.getSender(), "/image/pinkbin.png");
+            String profilePicture = chatMessage.getContent() != null ? chatMessage.getContent() : null;
+            charactersInRoom.put(chatMessage.getSender(), profilePicture);
             playerCharacters.put(roomId, charactersInRoom);
         }
 
-        // 맵 정보 포함하여 전송
         String currentMap = roomMaps.getOrDefault(roomId, "/image/map/1.png");
-
-        ChatMessage joinMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.JOIN)
-                .content(chatMessage.getSender() + " 님이 입장하였습니다.")
-                .roomId(roomId)
-                .build();
-
-        messagingTemplate.convertAndSend("/topic/" + roomId, joinMessage);
-
-        // 기존 플레이어 정보 및 맵 정보 전송
         Map<String, String> charactersInRoom = playerCharacters.get(roomId);
         StringBuilder allPlayersInfo = new StringBuilder();
         for (String player : playersInRoom) {
@@ -106,7 +69,6 @@ public class ChatController {
 
         messagingTemplate.convertAndSend("/topic/" + roomId, newUserMessage);
 
-        // 맵 정보 전송
         ChatMessage mapMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.CHANGE_MAP)
                 .content(currentMap)
@@ -114,20 +76,7 @@ public class ChatController {
                 .build();
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
-
-        // 현재 선택된 캐릭터 목록 전송
-        ChatMessage selectedCharactersMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.UPDATE)
-                .content(allPlayersInfo.toString())
-                .roomId(roomId)
-                .build();
-
-        messagingTemplate.convertAndSend("/topic/" + roomId, selectedCharactersMessage);
-
-        System.out.println("room number: " + newUserMessage.getRoomId());
-//        System.out.println("Sending existing players: " + newUserMessage.getContent());
     }
-
 
     @MessageMapping("/chat.leaveUser/{roomId}")
     public void leaveUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
@@ -139,11 +88,12 @@ public class ChatController {
             roomPlayers.put(roomId, playersInRoom);
         }
 
-        // 플레이어 캐릭터 초기화
         if (playerCharacters.containsKey(roomId)) {
             Map<String, String> charactersInRoom = playerCharacters.get(roomId);
-            charactersInRoom.remove(sender);
-            playerCharacters.put(roomId, charactersInRoom);
+            if (charactersInRoom != null) {
+                charactersInRoom.remove(sender);
+                playerCharacters.put(roomId, charactersInRoom);
+            }
         }
 
         // 퇴장 메시지 작성
@@ -174,14 +124,6 @@ public class ChatController {
 
         // 업데이트된 플레이어 정보 전송
         messagingTemplate.convertAndSend("/topic/" + roomId, updateUserMessage);
-
-//        System.out.println("Sending existing players: " + String.join(",", playersInRoom));
-    }
-
-
-    @MessageMapping("/chat.heartbeat/{roomId}")
-    public void receiveHeartbeat(@DestinationVariable String roomId, ChatMessage chatMessage) {
-        playerHeartbeat.put(chatMessage.getSender(), System.currentTimeMillis());
     }
 
     @MessageMapping("/chat.ready/{roomId}")
@@ -206,8 +148,6 @@ public class ChatController {
                         .roomId(roomId)
                         .build();
 
-                System.out.println("error message: " + errorMessage);
-
                 messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
                 return;
             }
@@ -222,7 +162,6 @@ public class ChatController {
                     .roomId(roomId)
                     .build();
 
-//            System.out.println("character selected: " + characterSelectMessage);
             messagingTemplate.convertAndSend("/topic/" + roomId, characterSelectMessage);
         }
     }
@@ -234,26 +173,22 @@ public class ChatController {
 
         if (playerCharacters.containsKey(roomId)) {
             Map<String, String> charactersInRoom = playerCharacters.get(roomId);
-            if (charactersInRoom.get(sender).equals(characterSrc)) {
-                charactersInRoom.put(sender, "/image/pinkbin.png"); // 기본 캐릭터로 설정
-                playerCharacters.put(roomId, charactersInRoom);
+            charactersInRoom.put(sender, characterSrc);
+            playerCharacters.put(roomId, charactersInRoom);
 
-                ChatMessage characterDeselectMessage = ChatMessage.builder()
-                        .type(ChatMessage.MessageType.DESELECT)
-                        .sender(sender)
-                        .content(characterSrc) // 캐릭터 이미지 경로 포함
-                        .roomId(roomId)
-                        .build();
+            ChatMessage characterDeselectMessage = ChatMessage.builder()
+                    .type(ChatMessage.MessageType.DESELECT)
+                    .sender(sender)
+                    .content(characterSrc)
+                    .roomId(roomId)
+                    .build();
 
-//                System.out.println("deselect: " + characterDeselectMessage);
-                messagingTemplate.convertAndSend("/topic/" + roomId, characterDeselectMessage);
-            }
+            messagingTemplate.convertAndSend("/topic/" + roomId, characterDeselectMessage);
         }
     }
 
     @MessageMapping("/chat.sendMessage/{roomId}")
     public void sendMessage(@DestinationVariable String roomId, ChatMessage chatMessage) {
-//        System.out.println("chatMessage: " + chatMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
     }
 
@@ -268,8 +203,6 @@ public class ChatController {
                 .build();
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
-
-//        System.out.println("Map changed for room: " + roomId + " to " + chatMessage.getContent());
     }
 
     @MessageMapping("/chat.startGame/{roomId}")
@@ -295,23 +228,15 @@ public class ChatController {
             playerSpeeds.put(player, random.nextInt(30) + 1); // 1~30 사이의 속도
         }
 
-        // 서버에서 계산된 순위 정보를 포함하여 클라이언트로 전송
-        List<Map.Entry<String, Integer>> sortedPlayers = playerSpeeds.entrySet()
-                .stream()
-                .sorted((entry1, entry2) -> entry2.getValue().compareTo(entry1.getValue())) // 역순으로 정렬
-                .collect(Collectors.toList());
-
+        // 서버에서 순위를 정하지 않고 속도 정보만 클라이언트로 전송
         StringBuilder gameInfo = new StringBuilder();
         gameInfo.append("Room ID: ").append(roomId).append("\n");
         gameInfo.append("Map: ").append(currentMap).append("\n");
         gameInfo.append("Players:\n");
-
-        int rank = 1;
-        for (Map.Entry<String, Integer> entry : sortedPlayers) {
-            gameInfo.append(rank).append(". ").append(entry.getKey())
+        for (Map.Entry<String, Integer> entry : playerSpeeds.entrySet()) {
+            gameInfo.append(entry.getKey())
                     .append(": ").append(charactersInRoom.get(entry.getKey()))
                     .append(", Speed: ").append(entry.getValue()).append("\n");
-            rank++;
         }
 
         ChatMessage startMessage = ChatMessage.builder()
@@ -320,8 +245,10 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
-        messagingTemplate.convertAndSend("/topic/" + roomId, startMessage); // 모든 클라이언트로 전송
+        System.out.println(startMessage);
+        messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
     }
+
 
 
     @GetMapping("/room/{roomId}/status")
@@ -333,12 +260,13 @@ public class ChatController {
         return ResponseEntity.ok(roomStatus);
     }
 
-    private String getRoomIdByPlayer(String playerName) {
-        for (Map.Entry<String, List<String>> entry : roomPlayers.entrySet()) {
-            if (entry.getValue().contains(playerName)) {
-                return entry.getKey();
-            }
-        }
-        return null;
-    }
+//    @MessageMapping("/chat.endGame/{roomId}")
+//    public void endGame(@DestinationVariable String roomId, ChatMessage chatMessage) {
+//        ChatMessage endGameMessage = ChatMessage.builder()
+//                .type(ChatMessage.MessageType.END_GAME)
+//                .content("The game has ended. Moving to YutPan.")
+//                .roomId(roomId)
+//                .build();
+//        messagingTemplate.convertAndSend("/topic/" + roomId, endGameMessage);
+//    }
 }

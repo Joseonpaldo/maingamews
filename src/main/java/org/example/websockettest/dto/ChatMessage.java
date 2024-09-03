@@ -32,7 +32,7 @@ public class ChatMessage {
         START_GAME,
         FINISH_RACE,
         UPDATE_SPEED,
-        HEARTBEAT
+        END_GAME
     }
 
 }
