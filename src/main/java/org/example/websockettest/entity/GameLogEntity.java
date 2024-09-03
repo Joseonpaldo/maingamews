@@ -27,6 +27,5 @@ public class GameLogEntity {
     private GameRoomEntity gameRoom;
     private int type;
     private String message;
-    @Column(nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private Timestamp createdAt;
 }
