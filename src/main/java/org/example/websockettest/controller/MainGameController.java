@@ -60,10 +60,10 @@ public class MainGameController {
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         String sessionId = (String) event.getMessage().getHeaders().get("simpSessionId");
         String roomId = sessionRoomId.get(sessionId);
-        System.out.println("끊김 roomId: " + roomId + " sessionId: " + sessionId);
         if (roomId == null || roomId.isEmpty()) {
             return;
         }
+        System.out.println("끊김 roomId: " + roomId + " sessionId: " + sessionId);
         var getPlayerData = players.get(roomId);
         for (Player player : getPlayerData) {
             if (player.getSessionId() != null && player.getSessionId().equals(sessionId)) {
