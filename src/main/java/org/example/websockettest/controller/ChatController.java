@@ -1,7 +1,15 @@
 package org.example.websockettest.controller;
 
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.example.websockettest.dto.ChatMessage;
+import org.example.websockettest.dto.LobbyPlayer;
+import org.example.websockettest.dto.Player;
+import org.example.websockettest.entity.GameRoomEntity;
+import org.example.websockettest.repository.GameRoomRepositoryImpl;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -9,26 +17,44 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-@RestController
+@Controller
+@RequiredArgsConstructor
 public class ChatController {
+    final private GameRoomRepositoryImpl gameRoomRepository;
 
     private final SimpMessagingTemplate messagingTemplate;
     private static final int MAX_PLAYERS = 4;
+
     private Map<String, List<String>> roomPlayers = new HashMap<>();
+    private Map<String, List<LobbyPlayer>> roomPlayersData = new HashMap<>();
+    private Map<String, LobbyPlayer> playerData = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
     private Map<String, String> roomMaps = new HashMap<>(); // 방별 맵 정보 저장
 
-    public ChatController(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
+
+    @EventListener
+    public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
+        System.out.println(playerData);
+        String sessionId = (String) event.getMessage().getHeaders().get("simpSessionId");
+        LobbyPlayer getPlayer= playerData.get(sessionId);
+        if (getPlayer == null) {
+            return;
+        }
+        String roomId = getPlayer.getRoomId();
+        String sender = getPlayer.getSender();
+        leavePlayer(roomId, sender);
     }
+
 
     @MessageMapping("/chat.addUser/{roomId}")
     public void addUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        System.out.println(chatMessage);
         List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
 
         if (playersInRoom.size() >= MAX_PLAYERS) {
@@ -39,6 +65,13 @@ public class ChatController {
             messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
             return;
         }
+
+        var playerData = roomPlayersData.getOrDefault(roomId, new ArrayList<>());
+        var lobbyPlayerData = LobbyPlayer.builder()
+                .nickname(chatMessage.getNickname())
+                .sender(chatMessage.getSender()).build();
+        playerData.add(lobbyPlayerData);
+        roomPlayersData.put(roomId, playerData);
 
         if (!playersInRoom.contains(chatMessage.getSender())) {
             playersInRoom.add(chatMessage.getSender());
@@ -53,8 +86,8 @@ public class ChatController {
         String currentMap = roomMaps.getOrDefault(roomId, "/image/map/1.png");
         Map<String, String> charactersInRoom = playerCharacters.get(roomId);
         StringBuilder allPlayersInfo = new StringBuilder();
-        for (String player : playersInRoom) {
-            allPlayersInfo.append(player).append(":").append(charactersInRoom.get(player)).append(",");
+        for (LobbyPlayer player : playerData) {
+            allPlayersInfo.append(player.getSender()).append("|").append(charactersInRoom.get(player.getSender())).append("|").append(player.getNickname()).append(",");
         }
 
         if (allPlayersInfo.length() > 0) {
@@ -76,54 +109,17 @@ public class ChatController {
                 .build();
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
+
+        System.out.println(roomPlayers);
+
+        roomCurrentPlayerAdd(roomId);
     }
+
 
     @MessageMapping("/chat.leaveUser/{roomId}")
     public void leaveUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
         String sender = chatMessage.getSender();
-        List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
-
-        if (playersInRoom.contains(sender)) {
-            playersInRoom.remove(sender);
-            roomPlayers.put(roomId, playersInRoom);
-        }
-
-        if (playerCharacters.containsKey(roomId)) {
-            Map<String, String> charactersInRoom = playerCharacters.get(roomId);
-            if (charactersInRoom != null) {
-                charactersInRoom.remove(sender);
-                playerCharacters.put(roomId, charactersInRoom);
-            }
-        }
-
-        // 퇴장 메시지 작성
-        ChatMessage leaveMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.LEAVE)
-                .content(sender + " 님이 퇴장하였습니다.")
-                .roomId(roomId)
-                .build();
-
-        // 퇴장 메시지 전송
-        messagingTemplate.convertAndSend("/topic/" + roomId, leaveMessage);
-
-        // 업데이트된 플레이어 정보 작성
-        StringBuilder allPlayersInfo = new StringBuilder();
-        for (String player : playersInRoom) {
-            allPlayersInfo.append(player).append(":").append(playerCharacters.get(roomId).get(player)).append(",");
-        }
-
-        if (allPlayersInfo.length() > 0) {
-            allPlayersInfo.deleteCharAt(allPlayersInfo.length() - 1);
-        }
-
-        ChatMessage updateUserMessage = ChatMessage.builder()
-                .type(ChatMessage.MessageType.UPDATE)
-                .content(allPlayersInfo.toString())
-                .roomId(roomId)
-                .build();
-
-        // 업데이트된 플레이어 정보 전송
-        messagingTemplate.convertAndSend("/topic/" + roomId, updateUserMessage);
+        leavePlayer(roomId, sender);
     }
 
     @MessageMapping("/chat.ready/{roomId}")
@@ -269,4 +265,63 @@ public class ChatController {
 //                .build();
 //        messagingTemplate.convertAndSend("/topic/" + roomId, endGameMessage);
 //    }
+    public void leavePlayer(String roomId, String sender){
+        List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
+
+        if (playersInRoom.contains(sender)) {
+            playersInRoom.remove(sender);
+            roomPlayers.put(roomId, playersInRoom);
+        }
+
+        if (playerCharacters.containsKey(roomId)) {
+            Map<String, String> charactersInRoom = playerCharacters.get(roomId);
+            if (charactersInRoom != null) {
+                charactersInRoom.remove(sender);
+                playerCharacters.put(roomId, charactersInRoom);
+            }
+        }
+
+        // 퇴장 메시지 작성
+        ChatMessage leaveMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.LEAVE)
+                .content(sender + " 님이 퇴장하였습니다.")
+                .roomId(roomId)
+                .build();
+
+        // 퇴장 메시지 전송
+        messagingTemplate.convertAndSend("/topic/" + roomId, leaveMessage);
+
+        // 업데이트된 플레이어 정보 작성
+        StringBuilder allPlayersInfo = new StringBuilder();
+        for (String player : playersInRoom) {
+            allPlayersInfo.append(player).append(":").append(playerCharacters.get(roomId).get(player)).append(",");
+        }
+
+        if (allPlayersInfo.length() > 0) {
+            allPlayersInfo.deleteCharAt(allPlayersInfo.length() - 1);
+        }
+
+        ChatMessage updateUserMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.UPDATE)
+                .content(allPlayersInfo.toString())
+                .roomId(roomId)
+                .build();
+
+        // 업데이트된 플레이어 정보 전송
+        messagingTemplate.convertAndSend("/topic/" + roomId, updateUserMessage);
+
+        roomCurrentPlayerLeave(roomId);
+    }
+
+    public void roomCurrentPlayerAdd(String roomId){
+        GameRoomEntity roomData = gameRoomRepository.findById(Long.valueOf(roomId)).get();
+        roomData.setCurrPlayer(roomData.getCurrPlayer() + 1);
+        gameRoomRepository.save(roomData);
+    }
+
+    public void roomCurrentPlayerLeave(String roomId){
+        GameRoomEntity roomData = gameRoomRepository.findById(Long.valueOf(roomId)).get();
+        roomData.setCurrPlayer(roomData.getCurrPlayer() - 1);
+        gameRoomRepository.save(roomData);
+    }
 }

@@ -14,6 +14,8 @@ public class ChatMessage {
     private String roomId;
     private String content;
     private String sender;
+    private String nickname;
+    private String session;
     private boolean ready;
 
 
