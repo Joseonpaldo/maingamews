@@ -10,5 +10,6 @@ public class LobbyPlayer {
     private String sender;
     private String nickname;
     private String session;
+    private String avatar;
     private int order;
 }
