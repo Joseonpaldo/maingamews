@@ -260,13 +260,27 @@ public class ChatController {
         return ResponseEntity.ok(roomStatus);
     }
 
-//    @MessageMapping("/chat.endGame/{roomId}")
-//    public void endGame(@DestinationVariable String roomId, ChatMessage chatMessage) {
-//        ChatMessage endGameMessage = ChatMessage.builder()
-//                .type(ChatMessage.MessageType.END_GAME)
-//                .content("The game has ended. Moving to YutPan.")
-//                .roomId(roomId)
-//                .build();
-//        messagingTemplate.convertAndSend("/topic/" + roomId, endGameMessage);
-//    }
+
+    @MessageMapping("/chat.updateRank/{roomId}")
+    public void updateRank(@DestinationVariable String roomId, List<Map<String, Object>> rankings) {
+
+        rankings.forEach(rankInfo -> {
+            String player = (String) rankInfo.get("name");
+            Integer userId = (Integer) rankInfo.get("userId");
+            Integer rank = (Integer) rankInfo.get("rank");
+            System.out.println("Player: " + player + ", Rank: " + rank + ", UserId: " + userId);
+        });
+
+        // 필요시 전체 순위 정보를 다시 클라이언트에 전송할 수 있습니다.
+        ChatMessage rankUpdateMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.RANK_UPDATE)
+                .content(rankings.toString()) // 또는 필요한 형식으로 변환
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/" + roomId, rankUpdateMessage);
+    }
+
+
+
 }
