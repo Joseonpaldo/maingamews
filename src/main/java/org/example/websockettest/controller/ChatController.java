@@ -195,6 +195,7 @@ public class ChatController {
 
     @MessageMapping("/chat.sendMessage/{roomId}")
     public void sendMessage(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        System.out.println("chatting : " + chatMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
     }
 
@@ -316,12 +317,13 @@ public class ChatController {
         // 업데이트된 플레이어 정보 작성
         StringBuilder allPlayersInfo = new StringBuilder();
         for (LobbyPlayer player : lobbyPlayerData) {
-            allPlayersInfo.append(player.getSender()).append("|").append(playerCharacters.get(player.getSender())).append("|").append(player.getNickname()).append(",");
+            allPlayersInfo.append(player.getSender()).append("|").append(playerCharacters.get(roomId).get(player.getSender())).append("|").append(player.getNickname()).append(",");
         }
 
         if (allPlayersInfo.length() > 0) {
             allPlayersInfo.deleteCharAt(allPlayersInfo.length() - 1);
         }
+
 
         ChatMessage updateUserMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.UPDATE)
