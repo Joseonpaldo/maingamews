@@ -3,13 +3,20 @@ package org.example.websockettest.controller;
 import lombok.RequiredArgsConstructor;
 import org.example.websockettest.dto.ChatMessage;
 import org.example.websockettest.dto.LobbyPlayer;
+import org.example.websockettest.entity.GameDataEntity;
 import org.example.websockettest.entity.GameRoomEntity;
+import org.example.websockettest.entity.UserEntity;
+import org.example.websockettest.repository.GameDataRepositoryImpl;
 import org.example.websockettest.repository.GameRoomRepositoryImpl;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
@@ -21,6 +28,8 @@ public class ChatController {
     private static final int MAX_PLAYERS = 4;
     final private GameRoomRepositoryImpl gameRoomRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final GameRoomRepositoryImpl gameRoomRepositoryImpl;
+    private final GameDataRepositoryImpl gameDataRepositoryImpl;
     private Map<String, List<String>> roomPlayers = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
     private Map<String, String> roomMaps = new HashMap<>(); // 방별 맵 정보 저장
@@ -234,7 +243,7 @@ public class ChatController {
         for (String player : playersInRoom) {
             playerSpeeds.put(player, random.nextInt(30) + 1); // 1~30 사이의 속도
         }
-
+        List<LobbyPlayer> lobbyPlayerDataList = roomPlayersData.get(roomId);
         // 서버에서 순위를 정하지 않고 속도 정보만 클라이언트로 전송
         StringBuilder gameInfo = new StringBuilder();
         gameInfo.append("Room ID: ").append(roomId).append("\n");
@@ -242,8 +251,15 @@ public class ChatController {
         gameInfo.append("Players:\n");
         for (Map.Entry<String, Integer> entry : playerSpeeds.entrySet()) {
             gameInfo.append(entry.getKey())
-                    .append(": ").append(charactersInRoom.get(entry.getKey()))
-                    .append(", Speed: ").append(entry.getValue()).append("\n");
+                    .append("|").append(charactersInRoom.get(entry.getKey()))
+                    .append("|").append(entry.getValue())
+                    .append("|");
+            for (LobbyPlayer lobbyPlayer : lobbyPlayerDataList) {
+                if (lobbyPlayer.getSender().equals(entry.getKey())) {
+                    gameInfo.append(lobbyPlayer.getNickname()).append("\n");
+                    ;
+                }
+            }
         }
 
         ChatMessage startMessage = ChatMessage.builder()
@@ -254,6 +270,43 @@ public class ChatController {
 
         System.out.println(startMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
+    }
+
+
+    @MessageMapping("/chat.mainGameStart/{roomId}")
+    public void startMainGame(@DestinationVariable String roomId, @Payload String playerData) {
+        System.out.println(roomId);
+        System.out.println(playerData);
+
+        JSONObject jsonObject = new JSONObject(playerData);
+        JSONArray displayedPlayers = jsonObject.getJSONArray("displayedPlayers");
+
+        List<LobbyPlayer> lobbyPlayerDataList = new ArrayList<>();
+
+        for (int i = 0; i < displayedPlayers.length(); i++) {
+            JSONObject player = displayedPlayers.getJSONObject(i);
+
+            String userId = player.getString("user_id");
+            String characterSrc = player.getString("characterSrc");
+            String[] parts = characterSrc.split("/");
+            String avatar = parts[parts.length - 1];
+            // .png 제거하기
+            if (avatar.endsWith(".png")) {
+                avatar = avatar.substring(0, avatar.lastIndexOf("."));
+            }
+            var putPlayer = LobbyPlayer.builder()
+                    .avatar(avatar)
+                    .order(i + 1)
+                    .sender(userId)
+                    .roomId(roomId)
+                    .build();
+
+            lobbyPlayerDataList.add(putPlayer);
+        }
+
+        if (lobbyPlayerDataList.size() == 4){
+            gameDataPut(lobbyPlayerDataList);
+        }
     }
 
 
@@ -347,5 +400,23 @@ public class ChatController {
         GameRoomEntity roomData = gameRoomRepository.findById(Long.valueOf(roomId)).get();
         roomData.setCurrPlayer(roomData.getCurrPlayer() - 1);
         gameRoomRepository.save(roomData);
+    }
+
+    @Transactional
+    public void gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
+        for (LobbyPlayer lobbyPlayer : lobbyPlayerData) {
+            GameDataEntity gameData = GameDataEntity.builder()
+                    .gameRoom(GameRoomEntity.builder().roomId(Long.valueOf(lobbyPlayer.getRoomId())).build())
+                    .user(UserEntity.builder().userId(Long.valueOf(lobbyPlayer.getSender())).build())
+                    .avatar(lobbyPlayer.getAvatar())
+                    .myTurn(lobbyPlayer.getOrder())
+                    .build();
+
+            gameDataRepositoryImpl.save(gameData);
+        }
+
+        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId())).get();
+        gameRoom.setRoomStatus(1);
+        gameRoomRepository.save(gameRoom);
     }
 }
