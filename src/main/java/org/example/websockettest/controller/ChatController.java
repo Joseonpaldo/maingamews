@@ -39,23 +39,16 @@ public class ChatController {
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
-        System.out.println("웹소켓 연결 : " + event.getMessage().getHeaders().get("simpSessionId"));
+        System.out.println("Connect : " + event.getMessage().getHeaders().get("simpSessionId"));
     }
 
     @EventListener
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         String sessionId = (String) event.getMessage().getHeaders().get("simpSessionId");
-        System.out.println("sessionId: " + sessionId);
+        System.out.println("Disconnect : " + sessionId);
         LobbyPlayer getPlayer = sessionByplayerData.get(sessionId);
         if (getPlayer == null) {
-            System.out.println();
             System.out.println("getPlayer is null");
-            System.out.println(sessionByplayerData);
-            System.out.println();
-            System.out.println();
-            System.out.println();
-            System.out.println();
-
             return;
         }
         String roomId = getPlayer.getRoomId();
@@ -67,7 +60,6 @@ public class ChatController {
 
     @MessageMapping("/chat.addUser/{roomId}")
     public void addUser(@DestinationVariable String roomId, ChatMessage chatMessage) {
-        System.out.println(chatMessage);
         List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
 
         if (playersInRoom.size() >= MAX_PLAYERS) {
@@ -127,9 +119,6 @@ public class ChatController {
                 .build();
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
-
-        System.out.println(roomPlayers);
-
 
         roomCurrentPlayerAdd(roomId);
     }
@@ -204,7 +193,6 @@ public class ChatController {
 
     @MessageMapping("/chat.sendMessage/{roomId}")
     public void sendMessage(@DestinationVariable String roomId, ChatMessage chatMessage) {
-        System.out.println("chatting : " + chatMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
     }
 
@@ -268,16 +256,12 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
-        System.out.println(startMessage);
         messagingTemplate.convertAndSend("/topic/" + roomId, startMessage);
     }
 
 
     @MessageMapping("/chat.mainGameStart/{roomId}")
     public void startMainGame(@DestinationVariable String roomId, @Payload String playerData) {
-        System.out.println(roomId);
-        System.out.println(playerData);
-
         JSONObject jsonObject = new JSONObject(playerData);
         JSONArray displayedPlayers = jsonObject.getJSONArray("displayedPlayers");
 
@@ -304,37 +288,37 @@ public class ChatController {
             lobbyPlayerDataList.add(putPlayer);
         }
 
-        if (lobbyPlayerDataList.size() == 4){
-            gameDataPut(lobbyPlayerDataList);
+        var isSave = gameDataPut(lobbyPlayerDataList);
+        if (isSave) {
+            ChatMessage mapMessage = ChatMessage.builder()
+                    .type(ChatMessage.MessageType.END_GAME)
+                    .content("Go Main Game")
+                    .roomId(roomId)
+                    .build();
+
+            messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
+        } else {
+            ChatMessage errorMessage = ChatMessage.builder()
+                    .type(ChatMessage.MessageType.ERROR)
+                    .content("No players in the room")
+                    .roomId(roomId)
+                    .build();
+            messagingTemplate.convertAndSend("/topic/" + roomId, errorMessage);
         }
     }
 
 
-//    @GetMapping("/room/{roomId}/status")
-//    public ResponseEntity<Map<String, Object>> getRoomStatus(@PathVariable String roomId) {
-//        Map<String, Object> roomStatus = new HashMap<>();
-//        roomStatus.put("players", roomPlayers.getOrDefault(roomId, new ArrayList<>()));
-//        roomStatus.put("characters", playerCharacters.getOrDefault(roomId, new HashMap<>()));
-//        roomStatus.put("map", roomMaps.getOrDefault(roomId, "/image/map/1.png"));
-//        return ResponseEntity.ok(roomStatus);
-//    }
 
-    //    @MessageMapping("/chat.endGame/{roomId}")
-//    public void endGame(@DestinationVariable String roomId, ChatMessage chatMessage) {
-//        ChatMessage endGameMessage = ChatMessage.builder()
-//                .type(ChatMessage.MessageType.END_GAME)
-//                .content("The game has ended. Moving to YutPan.")
-//                .roomId(roomId)
-//                .build();
-//        messagingTemplate.convertAndSend("/topic/" + roomId, endGameMessage);
-//    }
+
+
+
     public void leavePlayer(String roomId, String sender) {
         List<String> playersInRoom = roomPlayers.getOrDefault(roomId, new ArrayList<>());
         List<LobbyPlayer> lobbyPlayerData = roomPlayersData.get(roomId);
 
         System.out.println("lobbyPlayerData " + lobbyPlayerData);
 
-// 퇴장 메시지 작성
+        // 퇴장 메시지 작성
         ChatMessage leaveMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.LEAVE)
                 .roomId(roomId)
@@ -390,6 +374,7 @@ public class ChatController {
         roomCurrentPlayerLeave(roomId);
     }
 
+
     public void roomCurrentPlayerAdd(String roomId) {
         GameRoomEntity roomData = gameRoomRepository.findById(Long.valueOf(roomId)).get();
         roomData.setCurrPlayer(roomData.getCurrPlayer() + 1);
@@ -402,21 +387,27 @@ public class ChatController {
         gameRoomRepository.save(roomData);
     }
 
-    @Transactional
-    public void gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
-        for (LobbyPlayer lobbyPlayer : lobbyPlayerData) {
-            GameDataEntity gameData = GameDataEntity.builder()
-                    .gameRoom(GameRoomEntity.builder().roomId(Long.valueOf(lobbyPlayer.getRoomId())).build())
-                    .user(UserEntity.builder().userId(Long.valueOf(lobbyPlayer.getSender())).build())
-                    .avatar(lobbyPlayer.getAvatar())
-                    .myTurn(lobbyPlayer.getOrder())
-                    .build();
 
-            gameDataRepositoryImpl.save(gameData);
+    @Transactional
+    public boolean gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
+        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId())).get();
+        if (gameRoom.getRoomStatus() == 0) {
+            for (LobbyPlayer lobbyPlayer : lobbyPlayerData) {
+                GameDataEntity gameData = GameDataEntity.builder()
+                        .gameRoom(GameRoomEntity.builder().roomId(Long.valueOf(lobbyPlayer.getRoomId())).build())
+                        .user(UserEntity.builder().userId(Long.valueOf(lobbyPlayer.getSender())).build())
+                        .avatar(lobbyPlayer.getAvatar())
+                        .myTurn(lobbyPlayer.getOrder())
+                        .build();
+
+                gameDataRepositoryImpl.save(gameData);
+            }
+            gameRoom.setRoomStatus(1);
+            gameRoomRepository.save(gameRoom);
+
+            return true;
         }
 
-        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId())).get();
-        gameRoom.setRoomStatus(1);
-        gameRoomRepository.save(gameRoom);
+        return false;
     }
 }
