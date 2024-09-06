@@ -10,6 +10,8 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepositoryImpl extends JpaRepository<UserEntity, Long> {
+    UserEntity findByuserId(Long user_id);
+
     UserEntity findByEmail(String email);
 
     long countByEmailAndSocialProvider(String email, String socialProvider);
