@@ -15,6 +15,7 @@ public class ChatMessage {
     private String content;
     private String sender;
     private boolean ready;
+    private Integer userId; // userId 추가
 
 
     public enum MessageType {
@@ -32,7 +33,7 @@ public class ChatMessage {
         START_GAME,
         FINISH_RACE,
         UPDATE_SPEED,
-        END_GAME
+        RANK_UPDATE
     }
 
 }
