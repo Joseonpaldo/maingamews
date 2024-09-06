@@ -11,9 +11,10 @@ import lombok.NoArgsConstructor;
 @Data
 public class ChattingDto {
 
-        private Long senderId;
-        private Long receiverId;
-        private String messageContent;
-        private String timestamp;
+        private Long roomId;           // 채팅방 ID
+        private Long senderId;         // 보낸 사람 ID
+        private Long receiverId;       // 받는 사람 ID
+        private Long friendRelationId; // 친구 관계 ID
+        private String messageContent; // 메시지 내용
 
 }

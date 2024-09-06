@@ -1,11 +1,10 @@
-package com.example.demo.data.entity;
+package org.example.websockettest.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.example.websockettest.entity.FriendRelationEntity;
 
 @Entity
 @Table(name = "chat_room")

@@ -25,7 +25,7 @@ public class ChatMessageEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)
-    private UserEntity sender;
+    private UserEntity sender; // senderId 대신 UserEntity로 설정
 
     @Column(nullable = false, length = 1000)
     private String messageContent;
