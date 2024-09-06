@@ -19,11 +19,9 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private static final int MAX_PLAYERS = 4;
-    private static final long TIMEOUT = 5000; // heart 초
     private Map<String, List<String>> roomPlayers = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
     private Map<String, String> roomMaps = new HashMap<>(); // 방별 맵 정보 저장
-    private Map<String, Long> playerHeartbeat = new ConcurrentHashMap<>();
 
     public ChatController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
@@ -98,14 +96,17 @@ public class ChatController {
             }
         }
 
+        // 퇴장 메시지 작성
         ChatMessage leaveMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.LEAVE)
                 .content(sender + " 님이 퇴장하였습니다.")
                 .roomId(roomId)
                 .build();
 
+        // 퇴장 메시지 전송
         messagingTemplate.convertAndSend("/topic/" + roomId, leaveMessage);
 
+        // 업데이트된 플레이어 정보 작성
         StringBuilder allPlayersInfo = new StringBuilder();
         for (String player : playersInRoom) {
             allPlayersInfo.append(player).append(":").append(playerCharacters.get(roomId).get(player)).append(",");
@@ -121,6 +122,7 @@ public class ChatController {
                 .roomId(roomId)
                 .build();
 
+        // 업데이트된 플레이어 정보 전송
         messagingTemplate.convertAndSend("/topic/" + roomId, updateUserMessage);
     }
 
@@ -137,6 +139,7 @@ public class ChatController {
         if (playerCharacters.containsKey(roomId)) {
             Map<String, String> charactersInRoom = playerCharacters.get(roomId);
 
+            // 이미 선택된 캐릭터인지 확인
             if (charactersInRoom.containsValue(characterSrc)) {
                 ChatMessage errorMessage = ChatMessage.builder()
                         .type(ChatMessage.MessageType.ERROR)
@@ -257,13 +260,27 @@ public class ChatController {
         return ResponseEntity.ok(roomStatus);
     }
 
-//    @MessageMapping("/chat.endGame/{roomId}")
-//    public void endGame(@DestinationVariable String roomId, ChatMessage chatMessage) {
-//        ChatMessage endGameMessage = ChatMessage.builder()
-//                .type(ChatMessage.MessageType.END_GAME)
-//                .content("The game has ended. Moving to YutPan.")
-//                .roomId(roomId)
-//                .build();
-//        messagingTemplate.convertAndSend("/topic/" + roomId, endGameMessage);
-//    }
+
+    @MessageMapping("/chat.updateRank/{roomId}")
+    public void updateRank(@DestinationVariable String roomId, List<Map<String, Object>> rankings) {
+
+        rankings.forEach(rankInfo -> {
+            String player = (String) rankInfo.get("name");
+            Integer userId = (Integer) rankInfo.get("userId");
+            Integer rank = (Integer) rankInfo.get("rank");
+            System.out.println("Player: " + player + ", Rank: " + rank + ", UserId: " + userId);
+        });
+
+        // 필요시 전체 순위 정보를 다시 클라이언트에 전송할 수 있습니다.
+        ChatMessage rankUpdateMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.RANK_UPDATE)
+                .content(rankings.toString()) // 또는 필요한 형식으로 변환
+                .roomId(roomId)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/" + roomId, rankUpdateMessage);
+    }
+
+
+
 }
