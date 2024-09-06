@@ -12,6 +12,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
+        //구독
+        config.enableSimpleBroker("/topic", "queue");
+        //발행
         config.enableSimpleBroker("/topic","/queue");
         config.setApplicationDestinationPrefixes("/app");
     }
@@ -19,7 +22,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("*") // CORS 설정 추가
+//                .setAllowedOrigins("https://joseonpaldo.site/")  // CORS 설정 추가
+                .setAllowedOrigins("*")
                 .withSockJS();
     }
 }
