@@ -20,23 +20,21 @@ public class ChatRoomService {
 
     // 특정 친구 관계에 기반하여 채팅방을 생성하거나 기존 채팅방을 반환
     public ChatRoomEntity createOrGetChatRoom(Long friendRelationId) {
-        FriendRelationEntity friendRelation = friendRelationRepository.findById(friendRelationId)
+        return friendRelationRepository.findById(friendRelationId)
+                .map(friendRelation -> chatRoomRepository.findByFriendRelation(friendRelation)
+                        .orElseGet(() -> {
+                            ChatRoomEntity newRoom = ChatRoomEntity.builder()
+                                    .friendRelation(friendRelation)
+                                    .isActive(true)
+                                    .build();
+                            return chatRoomRepository.save(newRoom);
+                        }))
                 .orElseThrow(() -> new IllegalArgumentException("친구 관계를 찾을 수 없습니다."));
 
-        // 해당 친구 관계에 대한 채팅방이 있는지 확인
-        Optional<ChatRoomEntity> existingRoom = chatRoomRepository.findByFriendRelation(friendRelation);
+        System.out.println("친구 관계 ID: " + friendRelationId);
 
-        // 이미 채팅방이 있으면 반환, 없으면 새로 생성 후 반환
-        if (existingRoom.isPresent()) {
-            return existingRoom.get();
-        } else {
-            ChatRoomEntity newRoom = ChatRoomEntity.builder()
-                    .friendRelation(friendRelation)
-                    .isActive(true)
-                    .build();
-            return chatRoomRepository.save(newRoom);
-        }
     }
+
 
     // ID를 기반으로 채팅방을 조회
     public ChatRoomEntity getChatRoomById(Long roomId) {

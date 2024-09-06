@@ -36,27 +36,29 @@ public class ChattingController {
      * 클라이언트에서 메시지를 전송할 때 호출되는 메서드
      * 메시지를 DB에 저장하고 수신자에게 전송합니다.
      */
-    @MessageMapping("/chat/sendMessage/{userId}")
+    @MessageMapping("/chat/sendMessage")
     public void sendMessage(ChattingDto chatMessageDto) {
-        // 채팅방 조회 또는 생성
-        ChatRoomEntity chatRoom = chatRoomService.createOrGetChatRoom(chatMessageDto.getFriendRelationId());
+        try {
+            ChatRoomEntity chatRoom = chatRoomService.createOrGetChatRoom(chatMessageDto.getFriendRelationId());
+            ChatMessageEntity savedMessage = chatMessageService.saveMessage(
+                    chatRoom,
+                    chatMessageDto.getSenderId(),
+                    chatMessageDto.getMessageContent()
+            );
 
-        // 메시지를 DB에 저장
-        ChatMessageEntity savedMessage = chatMessageService.saveMessage(
-                chatRoom,
-                chatMessageDto.getSenderId(),  // UserEntity로 변환해야 함
-                chatMessageDto.getMessageContent()
-        );
+            messagingTemplate.convertAndSendToUser(
+                    chatMessageDto.getReceiverId().toString(),
+                    "/queue/messages",
+                    savedMessage
+            );
 
-        // 수신자에게 메시지 전송
-        messagingTemplate.convertAndSendToUser(
-                chatMessageDto.getReceiverId().toString(),  // 수신자의 ID를 사용한 경로
-                "/queue/messages",  // 수신자가 구독하는 경로
-                savedMessage  // 전송할 메시지
-        );
-
-        System.out.println("대화 저장: " + savedMessage);
+            System.out.println("대화 저장: " + savedMessage);
+        } catch (Exception e) {
+            System.err.println("메시지 전송 오류: " + e.getMessage());
+            // 필요시 추가 예외 처리
+        }
     }
+
 
 
     /**
