@@ -5,16 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
 public class ChattingDto {
 
-        private Long roomId;           // 채팅방 ID
-        private Long senderId;         // 보낸 사람 ID
-        private Long receiverId;       // 받는 사람 ID
-        private Long friendRelationId; // 친구 관계 ID
-        private String messageContent; // 메시지 내용
+        private Long senderId;
+        private Long receiverId;
+        private Long userId1;  // 수정: userId1 추가
+        private Long userId2;  // 수정: userId2 추가
+        private String messageContent;
+        private LocalDateTime timestamp;
 
 }

@@ -19,26 +19,33 @@ public class ChatRoomService {
     private FriendRelationRepositoryImpl friendRelationRepository;
 
     // 특정 친구 관계에 기반하여 채팅방을 생성하거나 기존 채팅방을 반환
-    public ChatRoomEntity createOrGetChatRoom(Long friendRelationId) {
-        return friendRelationRepository.findById(friendRelationId)
-                .map(friendRelation -> chatRoomRepository.findByFriendRelation(friendRelation)
-                        .orElseGet(() -> {
-                            ChatRoomEntity newRoom = ChatRoomEntity.builder()
-                                    .friendRelation(friendRelation)
-                                    .isActive(true)
-                                    .build();
-                            return chatRoomRepository.save(newRoom);
-                        }))
-                .orElseThrow(() -> new IllegalArgumentException("친구 관계를 찾을 수 없습니다."));
+    public ChatRoomEntity createOrGetChatRoom(Long userId1, Long userId2) {
+        // 양방향 친구 관계 검색
+        Optional<FriendRelationEntity> friendRelationOpt = friendRelationRepository.findByUserId1AndUserId2OrUserId2AndUserId1(userId1, userId2, userId1, userId2);
 
-        System.out.println("친구 관계 ID: " + friendRelationId);
+        // 친구 관계가 존재하지 않을 경우 새로 생성
+        FriendRelationEntity friendRelation = friendRelationOpt.orElseGet(() -> {
+            FriendRelationEntity newFriendRelation = FriendRelationEntity.builder()
+                    .userId1(userId1)
+                    .userId2(userId2)
+                    .build();
+            return friendRelationRepository.save(newFriendRelation);
+        });
 
+        // 해당 친구 관계에 기반한 채팅방이 없으면 새로 생성
+        return chatRoomRepository.findByFriendRelation(friendRelation)
+                .orElseGet(() -> {
+                    ChatRoomEntity newRoom = ChatRoomEntity.builder()
+                            .friendRelation(friendRelation)
+                            .isActive(true)
+                            .build();
+                    return chatRoomRepository.save(newRoom);
+                });
     }
-
 
     // ID를 기반으로 채팅방을 조회
     public ChatRoomEntity getChatRoomById(Long roomId) {
         return chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다. 채팅방 ID: " + roomId));
     }
 }

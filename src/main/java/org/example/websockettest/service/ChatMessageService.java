@@ -20,22 +20,23 @@ public class ChatMessageService {
     @Autowired
     private UserRepositoryImpl userRepository;  // UserEntity를 가져오기 위한 Repository 추가
 
-    // 메시지 저장
-    @Transactional  // 트랜잭션 처리
+    // 메시지 저장 서비스
+    @Transactional
     public ChatMessageEntity saveMessage(ChatRoomEntity chatRoom, Long senderId, String messageContent) {
-        // senderId를 통해 UserEntity 조회
+        // senderId로 UserEntity 조회
         UserEntity sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다. senderId: " + senderId));
 
         ChatMessageEntity message = ChatMessageEntity.builder()
                 .chatRoom(chatRoom)
-                .sender(sender)  // UserEntity로 설정
+                .sender(sender)
                 .messageContent(messageContent)
                 .sentAt(LocalDateTime.now())
                 .build();
 
         return chatMessageRepository.save(message);
     }
+
 
     // 특정 채팅방의 모든 메시지 불러오기
     public List<ChatMessageEntity> getMessagesByChatRoom(ChatRoomEntity chatRoom) {

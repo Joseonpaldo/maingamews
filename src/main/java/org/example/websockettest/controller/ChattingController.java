@@ -39,13 +39,22 @@ public class ChattingController {
     @MessageMapping("/chat/sendMessage")
     public void sendMessage(ChattingDto chatMessageDto) {
         try {
-            ChatRoomEntity chatRoom = chatRoomService.createOrGetChatRoom(chatMessageDto.getFriendRelationId());
+            // Null 값 체크
+            if (chatMessageDto.getSenderId() == null || chatMessageDto.getReceiverId() == null || chatMessageDto.getUserId1() == null || chatMessageDto.getUserId2() == null) {
+                throw new IllegalArgumentException("필수 값이 누락되었습니다. senderId, receiverId, 또는 userId1, userId2가 null입니다.");
+            }
+
+            // userId1과 userId2로 친구 관계를 확인하여 채팅방을 생성하거나 가져옵니다.
+            ChatRoomEntity chatRoom = chatRoomService.createOrGetChatRoom(chatMessageDto.getUserId1(), chatMessageDto.getUserId2());
+
+            // 메시지를 저장합니다.
             ChatMessageEntity savedMessage = chatMessageService.saveMessage(
                     chatRoom,
                     chatMessageDto.getSenderId(),
                     chatMessageDto.getMessageContent()
             );
 
+            // 메시지를 수신자에게 전송합니다.
             messagingTemplate.convertAndSendToUser(
                     chatMessageDto.getReceiverId().toString(),
                     "/queue/messages",
@@ -55,9 +64,11 @@ public class ChattingController {
             System.out.println("대화 저장: " + savedMessage);
         } catch (Exception e) {
             System.err.println("메시지 전송 오류: " + e.getMessage());
-            // 필요시 추가 예외 처리
         }
     }
+
+
+
 
 
 
