@@ -32,7 +32,6 @@ public class ChatController {
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
-        System.out.println("웹소켓 연결 : " + event.getMessage().getHeaders().get("simpSessionId"));
     }
 
     @EventListener
@@ -293,7 +292,8 @@ public class ChatController {
         while (iterator.hasNext()) {
             LobbyPlayer lobbyPlayer = iterator.next();
             if (lobbyPlayer.getSender().equals(sender)) {
-                leaveMessage.setContent(lobbyPlayer.getNickname() + " 님이 퇴장하였습니다.");
+                leaveMessage.setContent(lobbyPlayer.getNickname() + "님이 퇴장하였습니다.");
+
                 iterator.remove(); // 안전하게 요소 제거
             }
         }
@@ -378,6 +378,26 @@ public class ChatController {
 
         System.out.println(inviteMessage);
         System.out.println("사용자 " + invitedUser + " 가 초대되었습니다.");
+    }
+
+    @MessageMapping("/chat.friendRequest/{roomId}")
+    public void sendFriendRequest(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        String sender = chatMessage.getSender();
+        String receiver = chatMessage.getReceiver(); // 친구 요청 받는 사용자 ID
+
+        // 친구 요청 메시지 작성
+        ChatMessage friendRequestMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.FRIEND_REQUEST)
+                .sender(sender)
+                .receiver(receiver) // 수신자 추가
+                .nickname(chatMessage.getNickname()) // 요청 보낸 사람의 닉네임
+                .content("You have received a friend request.")
+                .build();
+
+        // 수신자에게 친구 요청 메시지 전송
+        messagingTemplate.convertAndSend("/topic/friendRequest/" + receiver, friendRequestMessage);
+
+        System.out.println("Friend request sent from " + sender + " to " + receiver);
     }
 
 

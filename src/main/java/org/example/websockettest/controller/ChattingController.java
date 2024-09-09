@@ -30,8 +30,6 @@ public class ChattingController {
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
-        System.out.println("WebSocket 연결된 세션 ID : " + event.getMessage().getHeaders().get("simpSessionId"));
-        System.out.println("연결된 사용자 정보 : " + event.getUser());  // WebSocket 연결된 사용자 정보 출력
     }
 
     /**
