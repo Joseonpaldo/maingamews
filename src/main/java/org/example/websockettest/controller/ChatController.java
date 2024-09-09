@@ -5,6 +5,8 @@ import org.example.websockettest.dto.ChatMessage;
 import org.example.websockettest.dto.LobbyPlayer;
 import org.example.websockettest.entity.GameRoomEntity;
 import org.example.websockettest.repository.GameRoomRepositoryImpl;
+import org.example.websockettest.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -348,4 +350,36 @@ public class ChatController {
         roomData.setCurrPlayer(roomData.getCurrPlayer() - 1);
         gameRoomRepository.save(roomData);
     }
+
+    @Autowired UserService userService;
+    //초대하기
+    @MessageMapping("/chat.inviteUser/{invitedUser}")
+    public void inviteUser(ChatMessage chatMessage) {
+        String sender = chatMessage.getSender();
+        String invitedUser = chatMessage.getInvitedUserId(); // 초대받는 사용자 ID를 올바른 필드에서 가져옴
+        Long userid = Long.parseLong(chatMessage.getSender());
+        String nickname = userService.getNicknameByUserIdentifyId(userid);
+
+        if (invitedUser == null || invitedUser.isEmpty()) {
+            throw new IllegalArgumentException("Invited user ID must not be null or empty");
+        }
+
+        // 초대 메시지 작성 및 전송
+        ChatMessage inviteMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.INVITE)
+                .sender(sender)
+                .content("You have been invited to join the room.")
+                .roomId(chatMessage.getRoomId())  // 방 ID 포함
+                .nickname(nickname)
+                .build();
+
+// 초대받은 사용자의 ID를 기반으로 메시지 전송
+        messagingTemplate.convertAndSend("/topic/" + invitedUser, inviteMessage);
+
+        System.out.println(inviteMessage);
+        System.out.println("사용자 " + invitedUser + " 가 초대되었습니다.");
+    }
+
+
+
 }

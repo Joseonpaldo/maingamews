@@ -2,6 +2,8 @@ package org.example.websockettest.repository;
 
 import org.example.websockettest.entity.FriendRelationEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,7 +16,9 @@ public interface FriendRelationRepositoryImpl extends JpaRepository<FriendRelati
 
     void deleteByUserId1AndUserId2OrUserId2AndUserId1(Long userId1, Long userId2, Long userId3, Long userId4);
 
-    Optional<FriendRelationEntity> findByUserId1AndUserId2OrUserId2AndUserId1(Long userId1, Long userId2, Long userId2Reversed, Long userId1Reversed);
+    @Query("SELECT f FROM FriendRelationEntity f WHERE (f.userId1 = :userId1 AND f.userId2 = :userId2) OR (f.userId1 = :userId2 AND f.userId2 = :userId1)")
+    Optional<FriendRelationEntity> findFriendRelation(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
 
+    Optional<FriendRelationEntity> findByUserId1AndUserId2OrUserId2AndUserId1(Long userId1, Long userId2, Long userId2Reversed, Long userId1Reversed);
 
 }

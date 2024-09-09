@@ -7,12 +7,14 @@ import org.example.websockettest.service.ChatMessageService;
 import org.example.websockettest.service.ChatRoomService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class ChattingController {
@@ -69,20 +71,4 @@ public class ChattingController {
 
 
 
-
-
-
-    /**
-     * 특정 채팅방의 모든 메시지를 조회하는 메서드
-     * 클라이언트가 채팅방에 들어올 때 이전 메시지를 불러오는 데 사용됩니다.
-     */
-    @GetMapping("/room/{roomId}/messages")
-    public List<ChatMessageEntity> getMessages(@PathVariable Long roomId) {
-        // 채팅방 ID로 채팅방을 조회
-        ChatRoomEntity chatRoom = chatRoomService.getChatRoomById(roomId);
-        // 해당 채팅방의 모든 메시지를 반환
-
-        System.out.println("chatroomw" + chatRoom);
-        return chatMessageService.getMessagesByChatRoom(chatRoom);
-    }
 }
