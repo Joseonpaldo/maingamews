@@ -17,7 +17,8 @@ public class ChatMessage {
     private String nickname;
     private String session;
     private boolean ready;
-
+    private String invitedUserId;
+    private String  receiver;
 
     public enum MessageType {
         SELECT,
@@ -34,7 +35,9 @@ public class ChatMessage {
         START_GAME,
         FINISH_RACE,
         UPDATE_SPEED,
-        END_GAME
+        END_GAME,
+        INVITE,
+        FRIEND_REQUEST
     }
 
 }

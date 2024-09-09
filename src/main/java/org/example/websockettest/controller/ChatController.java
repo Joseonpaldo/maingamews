@@ -8,6 +8,8 @@ import org.example.websockettest.entity.GameRoomEntity;
 import org.example.websockettest.entity.UserEntity;
 import org.example.websockettest.repository.GameDataRepositoryImpl;
 import org.example.websockettest.repository.GameRoomRepositoryImpl;
+import org.example.websockettest.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.context.event.EventListener;
@@ -39,7 +41,6 @@ public class ChatController {
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
-        System.out.println("Connect : " + event.getMessage().getHeaders().get("simpSessionId"));
     }
 
     @EventListener
@@ -328,7 +329,8 @@ public class ChatController {
         while (iterator.hasNext()) {
             LobbyPlayer lobbyPlayer = iterator.next();
             if (lobbyPlayer.getSender().equals(sender)) {
-                leaveMessage.setContent(lobbyPlayer.getNickname() + " 님이 퇴장하였습니다.");
+                leaveMessage.setContent(lobbyPlayer.getNickname() + "님이 퇴장하였습니다.");
+
                 iterator.remove(); // 안전하게 요소 제거
             }
         }
@@ -387,6 +389,54 @@ public class ChatController {
         gameRoomRepository.save(roomData);
     }
 
+    @Autowired UserService userService;
+    //초대하기
+    @MessageMapping("/chat.inviteUser/{invitedUser}")
+    public void inviteUser(ChatMessage chatMessage) {
+        String sender = chatMessage.getSender();
+        String invitedUser = chatMessage.getInvitedUserId(); // 초대받는 사용자 ID를 올바른 필드에서 가져옴
+        Long userid = Long.parseLong(chatMessage.getSender());
+        String nickname = userService.getNicknameByUserIdentifyId(userid);
+
+        if (invitedUser == null || invitedUser.isEmpty()) {
+            throw new IllegalArgumentException("Invited user ID must not be null or empty");
+        }
+
+        // 초대 메시지 작성 및 전송
+        ChatMessage inviteMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.INVITE)
+                .sender(sender)
+                .content("You have been invited to join the room.")
+                .roomId(chatMessage.getRoomId())  // 방 ID 포함
+                .nickname(nickname)
+                .build();
+
+// 초대받은 사용자의 ID를 기반으로 메시지 전송
+        messagingTemplate.convertAndSend("/topic/" + invitedUser, inviteMessage);
+
+        System.out.println(inviteMessage);
+        System.out.println("사용자 " + invitedUser + " 가 초대되었습니다.");
+    }
+
+    @MessageMapping("/chat.friendRequest/{roomId}")
+    public void sendFriendRequest(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        String sender = chatMessage.getSender();
+        String receiver = chatMessage.getReceiver(); // 친구 요청 받는 사용자 ID
+
+        // 친구 요청 메시지 작성
+        ChatMessage friendRequestMessage = ChatMessage.builder()
+                .type(ChatMessage.MessageType.FRIEND_REQUEST)
+                .sender(sender)
+                .receiver(receiver) // 수신자 추가
+                .nickname(chatMessage.getNickname()) // 요청 보낸 사람의 닉네임
+                .content("You have received a friend request.")
+                .build();
+
+        // 수신자에게 친구 요청 메시지 전송
+        messagingTemplate.convertAndSend("/topic/friendRequest/" + receiver, friendRequestMessage);
+
+        System.out.println("Friend request sent from " + sender + " to " + receiver);
+    }
 
     @Transactional
     public boolean gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
