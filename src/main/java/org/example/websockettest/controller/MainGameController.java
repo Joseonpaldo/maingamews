@@ -311,6 +311,34 @@ public class MainGameController {
     }
 
 
+    @MessageMapping("/main/roulette/{roomId}")
+    public void rouletteStart(@DestinationVariable String roomId, @Header String name) {
+        players.get(roomId).forEach(player -> {
+            if (player.isMyTurn() &&  player.getPlayer().equals(name)) {
+                int rand = (int) (Math.random() * 6 + 1);
+
+                SendMessage roulette = SendMessage.builder().Type("rouletteStart").Message(String.valueOf(rand)).build();
+                messagingTemplate.convertAndSend("/topic/roulette/" + roomId, roulette);
+            }
+        });
+    }
+
+
+
+    @MessageMapping("/main/mini-game-step/{roomId}")
+    public void miniGameStep(@DestinationVariable String roomId, @Header String name) {
+        players.get(roomId).forEach(player -> {
+            if (player.isMyTurn() &&  player.getPlayer().equals(name)) {
+                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step").build();
+                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
+            }
+        });
+
+    }
+
+
+
+
     public int throwYut() {
         int[] result = {1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 2};
         int rand = (int) (Math.random() * 16);
