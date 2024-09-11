@@ -28,9 +28,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ChatController {
     private static final int MAX_PLAYERS = 4;
-    final private GameRoomRepositoryImpl gameRoomRepository;
+    private final GameRoomRepositoryImpl gameRoomRepository;
     private final SimpMessagingTemplate messagingTemplate;
-    private final GameRoomRepositoryImpl gameRoomRepositoryImpl;
     private final GameDataRepositoryImpl gameDataRepositoryImpl;
     private Map<String, List<String>> roomPlayers = new HashMap<>();
     private Map<String, Map<String, String>> playerCharacters = new HashMap<>();
@@ -462,7 +461,7 @@ public class ChatController {
 
     @Transactional
     public boolean gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
-        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId()))
+        GameRoomEntity gameRoom = gameRoomRepository.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId()))
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
         // currentMap 관련 로직을 제거합니다.
