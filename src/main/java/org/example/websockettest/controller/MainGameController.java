@@ -397,24 +397,32 @@ public class MainGameController {
     public void miniGameGetResultNum(@DestinationVariable String roomId,
                                      @Header String name,
                                      @Header String number) {
-        players.get(roomId).forEach(player -> {
-            if (player.isMyTurn() && player.getPlayer().equals(name)) {
-                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step-close").build();
-                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
+        List<Player> roomPlayers = players.get(roomId);
 
-//                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
-//                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+        // 해당 플레이어가 턴을 가지고 있는지 확인
+        Optional<Player> currentPlayer = roomPlayers.stream()
+                .filter(player -> player.isMyTurn() && player.getPlayer().equals(name))
+                .findFirst();
 
+        currentPlayer.ifPresent(player -> {
+            SendMessage miniGameStep = SendMessage.builder()
+                    .Type("commend")
+                    .Message("mini-game-step-close")
+                    .build();
+            messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
 
-                SendMessage miniGameResult = SendMessage.builder().Type("result").Message(number).build();
-                messagingTemplate.convertAndSend("/topic/mini-game/" + roomId, miniGameResult);
-            }
+            SendMessage miniGameResult = SendMessage.builder()
+                    .Type("result")
+                    .Message(number)
+                    .build();
+            messagingTemplate.convertAndSend("/topic/mini-game/" + roomId, miniGameResult);
         });
-
-
     }
 
 
+
+    //                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
+//                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
     public int throwYut() {
         int[] result = {1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 2};
         int rand = (int) (Math.random() * 16);
@@ -497,6 +505,42 @@ public class MainGameController {
                 .build();
 
         gameLogRepository.save(gameLog);
+    }
+
+
+    @Transactional
+    public void mainGameEnd(Long roomId, Long winUserId) {
+        List<GameDataEntity> data = gameDataRepository.findAllByRoomId(roomId);
+
+        // 사용자 데이터 업데이트
+        Map<Long, UserEntity> userDataMap = new HashMap<>();
+        for (GameDataEntity gameData : data) {
+            var userData = gameData.getUser();
+            userData.setTot4p(userData.getTot4p() + 1);
+            if (userData.getUserId().equals(winUserId)) {
+                userData.setWin4p(userData.getWin4p() + 1);
+            }
+            userDataMap.put(userData.getUserId(), userData);
+        }
+
+        // 사용자 데이터 일괄 저장
+        userRepositoryImpl.saveAll(userDataMap.values());
+
+        // 게임 방 상태 업데이트
+        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+        gameRoom.setRoomStatus(3);
+
+        // 방 관련 데이터 제거
+        removeRoomData(roomId);
+    }
+
+    private void removeRoomData(Long roomId) {
+        players.remove(roomId.toString());
+        chatLogs.remove(roomId.toString());
+        gameLogs.remove(roomId.toString());
+        currentOrder.remove(roomId.toString());
+        currentThrow.remove(roomId.toString());
     }
 
 
