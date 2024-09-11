@@ -12,4 +12,5 @@ public class LobbyPlayer {
     private String session;
     private String avatar;
     private int order;
+    private String currentMap;
 }

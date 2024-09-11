@@ -182,7 +182,6 @@ public class MainGameController {
     @MessageMapping("/main/arrowClick/{roomId}")
     public void arrowClick(@DestinationVariable String roomId, @Header String name, @Header Integer location, @Header Integer resultDelIndex) {
         resultDelete(resultDelIndex, roomId);
-//        System.out.println(yutResult.get(roomId).toString());
         for (Player player : players.get(roomId)) {
             if (player.isMyTurn() && player.getPlayer().equals(name)) {
                 player.setLocation(location);
@@ -193,6 +192,39 @@ public class MainGameController {
                 sendPlayerInfo(roomId);
             }
         }
+    }
+
+    @MessageMapping("/main/pay-toll/{roomId}")
+    public void payToll(@DestinationVariable String roomId,
+                        @Header String name,
+                        @Header Integer location,
+                        @Header Integer price,
+                        @Header String owner) {
+        int landmark = 0;
+        //랜드마크 등급 찾기
+        for (Player player : players.get(roomId)) {
+            if (player.getPlayer().equals(owner)) {
+                for (Location thisLocation : player.getEstate()) {
+                    if (thisLocation.getLocation() == location) {
+                        landmark = thisLocation.getLandmark();
+                    }
+                }
+            }
+        }
+
+        //돈 뺐고 돈 넣기
+        for (Player player : players.get(roomId)) {
+            if (player.getPlayer().equals(name)) {
+                int myMoney = (int) (player.getMoney() - (price * landmark * 100));
+                player.setMoney(myMoney);
+            }
+            if (player.getPlayer().equals(owner)) {
+                int myMoney = (int) (player.getMoney() + (price * landmark * 100));
+                player.setMoney(myMoney);
+            }
+        }
+
+        sendPlayerInfo(roomId);
     }
 
     @MessageMapping("/main/buyEstate/{roomId}")
@@ -233,35 +265,51 @@ public class MainGameController {
 
     @MessageMapping("/main/passTurn/{roomId}")
     public void passTurn(@DestinationVariable String roomId, @Header String name) {
-        for (Player player : players.get(roomId)) {
-            if (!player.isMyTurn() && player.getPlayer().equals(name)) {
-                return;
-            }
+        List<Player> playerList = players.get(roomId);
+
+        // 자기 턴이 아닐 경우 요청을 무시
+        if (playerList.stream().noneMatch(player -> player.isMyTurn() && player.getPlayer().equals(name))) {
+            return;
         }
 
         int nextTurn = currentOrder.get(roomId) + 1;
-        if (nextTurn > 4) {
-            nextTurn = 1;
-        }
 
-        for (Player player : players.get(roomId)) {
-            if (player.getMoney() < 0) {
-                nextTurn++;
-                if (nextTurn > 4) {
-                    nextTurn = 1;
+        // 다음 턴 계산
+        nextTurn = (nextTurn > 4) ? 1 : nextTurn;
+        System.out.println("현재 턴 : " + nextTurn);
+
+        // 죽은 플레이어 확인 및 턴 조정
+        while (true) {
+            boolean playerFound = false;
+            for (Player player : playerList) {
+                if (player.getMoney() < 0 && player.getOrder() == nextTurn) {
+                    System.out.println("죽은 사람 : " + player.getPlayer());
+                    nextTurn = (nextTurn % 4) + 1; // 다음 턴으로 이동
+                    System.out.println("죽은사람 넘기고 : " + nextTurn);
+                    playerFound = true;
+                    break; // 한 번 죽은 플레이어를 찾으면 루프를 종료하고 다시 턴 계산
                 }
             }
-        }
-        currentOrder.put(roomId, nextTurn);
-        currentThrow.put(roomId, true);
-        for (Player player : players.get(roomId)) {
-            player.setMyTurn(false);
-            if (player.getOrder() == nextTurn) {
-                player.setMyTurn(true);
+            if (!playerFound) {
+                break; // 더 이상 죽은 플레이어가 없다면 루프 종료
             }
         }
+
+        // 턴 업데이트
+        currentOrder.put(roomId, nextTurn);
+        currentThrow.put(roomId, true);
+
+        // 플레이어 턴 설정
+        for (Player player : playerList) {
+            player.setMyTurn(player.getOrder() == nextTurn);
+        }
+
+        // 변경된 playerList를 다시 players에 저장
+        players.put(roomId, playerList);
+
         sendPlayerInfo(roomId);
     }
+
 
     @MessageMapping("/main/chatLog/join/{roomId}")
     public void joinLog(@DestinationVariable String roomId) {
@@ -276,7 +324,7 @@ public class MainGameController {
         if (gameLogList == null) {
             gameLogList = new ArrayList<>();
         }
-        MainGameLoggingDto joinLog =  MainGameLoggingDto.builder().timestamp(new Timestamp(new Date().getTime())).message("입장").build();
+        MainGameLoggingDto joinLog = MainGameLoggingDto.builder().timestamp(new Timestamp(new Date().getTime())).message("입장").build();
         gameLogList.add(joinLog);
         gameLogs.put(String.valueOf(roomId), gameLogList);
 
@@ -314,7 +362,7 @@ public class MainGameController {
     @MessageMapping("/main/roulette/{roomId}")
     public void rouletteStart(@DestinationVariable String roomId, @Header String name) {
         players.get(roomId).forEach(player -> {
-            if (player.isMyTurn() &&  player.getPlayer().equals(name)) {
+            if (player.isMyTurn() && player.getPlayer().equals(name)) {
                 int rand = (int) (Math.random() * 6 + 1);
 
                 SendMessage roulette = SendMessage.builder().Type("rouletteStart").Message(String.valueOf(rand)).build();
@@ -323,20 +371,46 @@ public class MainGameController {
         });
     }
 
+//    @MessageMapping("/main/bankruptcy/{roomId}")
+//    public void bankruptcy(@DestinationVariable String roomId, @Header String name) {
+//        players.get(roomId).forEach(player -> {
+//            if (player.isMyTurn() && player.getPlayer().equals(name)) {
+//                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step-open").build();
+//                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
+//            }
+//        });
+//    }
 
 
     @MessageMapping("/main/mini-game-step/{roomId}")
     public void miniGameStep(@DestinationVariable String roomId, @Header String name) {
         players.get(roomId).forEach(player -> {
-            if (player.isMyTurn() &&  player.getPlayer().equals(name)) {
-                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step").build();
+            if (player.isMyTurn() && player.getPlayer().equals(name)) {
+                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step-open").build();
                 messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
             }
         });
-
     }
 
 
+    @MessageMapping("/mini-game/result/{roomId}")
+    public void miniGameGetResultNum(@DestinationVariable String roomId,
+                                     @Header String name,
+                                     @Header String number) {
+        players.get(roomId).forEach(player -> {
+            if (player.isMyTurn() && player.getPlayer().equals(name)) {
+                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step-close").build();
+                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
+
+                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
+                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+
+
+            }
+        });
+
+
+    }
 
 
     public int throwYut() {
