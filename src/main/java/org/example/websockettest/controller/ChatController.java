@@ -199,16 +199,38 @@ public class ChatController {
 
     @MessageMapping("/chat.changeMap/{roomId}")
     public void changeMap(@DestinationVariable String roomId, ChatMessage chatMessage) {
-        roomMaps.put(roomId, chatMessage.getContent());
+        String newMap = chatMessage.getContent();
 
+        // 새로운 맵 정보가 유효한지 확인
+        if (newMap == null || newMap.isEmpty()) {
+            System.out.println("Received invalid map value: " + newMap);
+            return;
+        }
+
+        roomMaps.put(roomId, newMap);
+
+        GameRoomEntity gameRoom = gameRoomRepository.findById(Long.valueOf(roomId))
+                .orElseThrow(() -> new RuntimeException("Room not found"));
+
+        // 맵 업데이트
+        gameRoom.setCurrentMap(newMap);  // currentMap 업데이트
+
+        // DB에 저장
+        gameRoomRepository.save(gameRoom);
+
+
+        // 맵 변경 메시지 전송
         ChatMessage mapMessage = ChatMessage.builder()
                 .type(ChatMessage.MessageType.CHANGE_MAP)
-                .content(chatMessage.getContent())
+                .content(newMap)
                 .roomId(roomId)
                 .build();
 
         messagingTemplate.convertAndSend("/topic/" + roomId, mapMessage);
     }
+
+
+
 
     @MessageMapping("/chat.startGame/{roomId}")
     public void startGame(@DestinationVariable String roomId, ChatMessage chatMessage) {
@@ -440,7 +462,11 @@ public class ChatController {
 
     @Transactional
     public boolean gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
-        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId())).get();
+        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId()))
+                .orElseThrow(() -> new RuntimeException("Room not found"));
+
+        // currentMap 관련 로직을 제거합니다.
+
         if (gameRoom.getRoomStatus() == 0) {
             for (LobbyPlayer lobbyPlayer : lobbyPlayerData) {
                 GameDataEntity gameData = GameDataEntity.builder()
@@ -460,4 +486,9 @@ public class ChatController {
 
         return false;
     }
+
+
+
+
+
 }
