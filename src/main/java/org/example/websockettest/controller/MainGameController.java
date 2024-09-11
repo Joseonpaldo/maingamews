@@ -402,10 +402,12 @@ public class MainGameController {
                 SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step-close").build();
                 messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
 
-                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
-                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+//                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
+//                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
 
 
+                SendMessage miniGameResult = SendMessage.builder().Type("result").Message(number).build();
+                messagingTemplate.convertAndSend("/topic/mini-game/" + roomId, miniGameResult);
             }
         });
 
