@@ -28,6 +28,5 @@ public class GameRoomEntity {
     @ColumnDefault("0")
     private int currPlayer;
     private int budget;
-    @ColumnDefault("")
     private String currentMap;
 }

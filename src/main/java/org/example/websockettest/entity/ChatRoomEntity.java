@@ -17,7 +17,7 @@ public class ChatRoomEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long roomId;
 
-    @ManyToOne(fetch = FetchType.EAGER)  // 지연 로딩 대신 즉시 로딩으로 변경
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "friend_relation_id", nullable = false)
     private FriendRelationEntity friendRelation;
 
