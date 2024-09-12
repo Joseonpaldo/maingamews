@@ -461,6 +461,9 @@ public class ChatController {
 
     @Transactional
     public boolean gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
+        if (lobbyPlayerData.size() != 4) {
+            return false;
+        }
         GameRoomEntity gameRoom = gameRoomRepository.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId()))
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 

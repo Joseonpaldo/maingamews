@@ -311,6 +311,24 @@ public class MainGameController {
     }
 
 
+    @MessageMapping("/main/dead/{roomId}")
+    public void userDead(@DestinationVariable String roomId, @Header String name) {
+        List<Player> playerList = players.get(roomId);
+        for (Player player : playerList) {
+            if (player.getPlayer().equals(name)) {
+                player.setEstate(null);
+            }
+        }
+
+        players.put(roomId, playerList);
+
+        sendPlayerInfo(roomId);
+
+        SendMessage userDead = SendMessage.builder().Type("userDead").Message(name).build();
+        messagingTemplate.convertAndSend("/topic/main-game/" + roomId, userDead);
+    }
+
+
     @MessageMapping("/main/chatLog/join/{roomId}")
     public void joinLog(@DestinationVariable String roomId) {
         System.out.println("join ");
