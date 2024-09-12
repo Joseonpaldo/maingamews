@@ -8,6 +8,7 @@ import org.example.websockettest.entity.GameRoomEntity;
 import org.example.websockettest.entity.UserEntity;
 import org.example.websockettest.repository.GameDataRepositoryImpl;
 import org.example.websockettest.repository.GameRoomRepositoryImpl;
+import org.example.websockettest.service.ChatMessageService;
 import org.example.websockettest.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.json.JSONArray;
@@ -19,6 +20,9 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
@@ -38,6 +42,8 @@ public class ChatController {
 
     private Map<String, List<LobbyPlayer>> roomPlayersData = new HashMap<>();
     private Map<String, LobbyPlayer> sessionByplayerData = new HashMap<>(); //유저 지울때 sender, roomid 필요해서 session으로 저장
+    @Autowired
+    private ChatMessageService chatMessageService;
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
@@ -485,6 +491,19 @@ public class ChatController {
         }
 
         return false;
+    }
+
+    //lobby 방 삭제, 체크버튼
+    @GetMapping("/game/myRoom/{roomId}/{userId}")
+    public boolean hostCheck(@PathVariable Long roomId, @PathVariable Long userId){
+        return chatMessageService.hostCheck(roomId, userId);
+    }
+
+
+    @DeleteMapping("/game/room/delete/{roomId}/{userId}")
+    public void roomDelete(@PathVariable Long roomId, @PathVariable Long userId){
+
+        chatMessageService.roomDelete(roomId, userId);
     }
 
 
