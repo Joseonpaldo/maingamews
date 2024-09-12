@@ -19,34 +19,40 @@ public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userId;   //그냥 인덱스
+
     @Column(nullable = false, unique = true, name = "user_identify_id")
     private String userIdentifyId;
+
     private String email;   //요놈이 아이디
+
     @Column(nullable = false)
     private String nickname;
+
     @Column(updatable = false, name = "social_provider")
     private String socialProvider;
+
     @Column(name = "profile_image")
     private String profilePicture;
+
     @Column(name = "provider_access_token")
     private String providerAccessToken;
 
-    @Column(columnDefinition = "int default 0")
-    private int tot2p;
+    @Column(name = "tot2p")
+    private int tot2p = 0;
 
-    @Column(columnDefinition = "int default 0")
-    private int win2p;
+    @Column(name = "win2p")
+    private int win2p = 0;
 
-    @Column(columnDefinition = "int default 0")
-    private int tot4p;
+    @Column(name = "tot4p")
+    private int tot4p = 0;
 
-    @Column(columnDefinition = "int default 0")
-    private int win4p;
+    @Column(name = "win4p")
+    private int win4p = 0;
 
-    @Column(precision = 5, scale = 2, columnDefinition = "decimal(5,2) default 0.00")
+    @Column(name = "win_rate2p")
     private BigDecimal winRate2p;
 
-    @Column(precision = 5, scale = 2, columnDefinition = "decimal(5,2) default 0.00")
+    @Column(name = "win_rate4p")
     private BigDecimal winRate4p;
 
     @PrePersist
