@@ -20,9 +20,6 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
@@ -467,9 +464,6 @@ public class ChatController {
 
     @Transactional
     public boolean gameDataPut(List<LobbyPlayer> lobbyPlayerData) {
-        if (lobbyPlayerData.size() != 4) {
-            return false;
-        }
         GameRoomEntity gameRoom = gameRoomRepository.findById(Long.valueOf(lobbyPlayerData.get(0).getRoomId()))
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
@@ -495,9 +489,8 @@ public class ChatController {
         return false;
     }
 
-
-
-
-
-
+    @MessageMapping("/chat.deleteRoom/{roomId}")
+    public void  sendDeleteRoom(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
+    }
 }
