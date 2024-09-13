@@ -486,8 +486,8 @@ public class ChatController {
         return false;
     }
 
-
-
-
-
+    @MessageMapping("/chat.deleteRoom/{roomId}")
+    public void  sendDeleteRoom(@DestinationVariable String roomId, ChatMessage chatMessage) {
+        messagingTemplate.convertAndSend("/topic/" + roomId, chatMessage);
+    }
 }
