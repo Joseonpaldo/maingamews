@@ -166,10 +166,12 @@ public class MainGameController {
                 // 크게 한바퀴 돌았을때
                 if (originIndex >= 24 && player.getLocation() <= 23) {
                     displayIndex1 -= 24;
+                    player.setMoney(player.getMoney() + 300);
                 } else if (player.getLocation() >= 30 && player.getLocation() <= 36 && originIndex > 36) {
                     displayIndex1 = originIndex - 37 + 18;
                 } else if (player.getLocation() >= 40 && player.getLocation() <= 46 && originIndex > 46) {
                     displayIndex1 = originIndex - 47;
+                    player.setMoney(player.getMoney() + 300);
                 } else if (originIndex == 33 || originIndex == 43) {
                     // 중앙
                     displayIndex1 = 100;
@@ -178,6 +180,8 @@ public class MainGameController {
                 messagingTemplate.convertAndSend("/topic/main-game/" + roomId, results);
             }
         }
+
+        sendPlayerInfo(roomId);
     }
 
     @MessageMapping("/main/arrowClick/{roomId}")
@@ -216,11 +220,11 @@ public class MainGameController {
         //돈 뺐고 돈 넣기
         for (Player player : players.get(roomId)) {
             if (player.getPlayer().equals(name)) {
-                int myMoney = (int) (player.getMoney() - (price * landmark * 100));
+                int myMoney = (int) (player.getMoney() - (price * landmark));
                 player.setMoney(myMoney);
             }
             if (player.getPlayer().equals(owner)) {
-                int myMoney = (int) (player.getMoney() + (price * landmark * 100));
+                int myMoney = (int) (player.getMoney() + (price * landmark));
                 player.setMoney(myMoney);
             }
         }
