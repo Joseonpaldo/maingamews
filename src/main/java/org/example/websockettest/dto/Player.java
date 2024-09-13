@@ -19,4 +19,6 @@ public class Player {
     private boolean myTurn;
     private List<Location> estate;
     private String SessionId;
+    private int rank;
+    private boolean live;
 }

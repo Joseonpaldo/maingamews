@@ -42,6 +42,7 @@ public class MainGameController {
     public Map<String, Integer> currentOrder = new HashMap<>();
     public Map<String, Boolean> currentThrow = new HashMap<>();
     public Map<String, String> sessionRoomId = new HashMap<>();
+    public Map<String, Integer> bankruptcy = new HashMap<>();
 
     Gson gson = new Gson();
 
@@ -304,6 +305,40 @@ public class MainGameController {
             player.setMyTurn(player.getOrder() == nextTurn);
         }
 
+        //순위 재 설정
+        // money가 0보다 큰 플레이어만 필터링하고 정렬
+        List<Player> sortedPlayers = playerList.stream()
+                .filter(player -> player.getMoney() > 0)
+                .sorted(Comparator.comparingDouble(Player::getMoney).reversed()) // money 기준으로 내림차순 정렬
+                .toList();
+
+            System.out.println("sortedPlayers");
+        sortedPlayers.forEach(player ->{
+            System.out.println(player.getName());
+            System.out.println(player.getRank());
+        });
+
+        // 랭크 업데이트
+        for (int i = 0; i < sortedPlayers.size(); i++) {
+            Player player = sortedPlayers.get(i);
+            player.setRank(i + 1); // 랭크는 1부터 시작
+        }
+
+        // 랭크가 업데이트된 플레이어를 playerList에 반영
+        for (Player player : playerList) {
+                sortedPlayers.stream()
+                        .filter(sortedPlayer -> sortedPlayer.getPlayer().equals(player.getPlayer()))
+                        .findFirst()
+                        .ifPresent(sortedPlayer -> player.setRank(sortedPlayer.getRank())); // 순위가 있을 경우만 업데이트
+        }
+
+            System.out.println("playerList");
+        playerList.forEach(player ->{
+            System.out.println(player.getName());
+            System.out.println(player.getRank());
+        });
+
+
         // 변경된 playerList를 다시 players에 저장
         players.put(roomId, playerList);
 
@@ -314,18 +349,45 @@ public class MainGameController {
     @MessageMapping("/main/dead/{roomId}")
     public void userDead(@DestinationVariable String roomId, @Header String name) {
         List<Player> playerList = players.get(roomId);
-        for (Player player : playerList) {
-            if (player.getPlayer().equals(name)) {
-                player.setEstate(null);
-            }
+        int bankruptcyCount = bankruptcy.getOrDefault(roomId, 4);
+        System.out.println(bankruptcyCount);
+
+        playerList.stream()
+                .filter(player -> player.getPlayer().equals(name) && player.getMoney() < 0 && player.isLive())
+                .findFirst()
+                .ifPresent(player -> {
+                    player.setRank(bankruptcyCount);
+                    player.setEstate(null);
+                    player.setLive(false);
+                    sendPlayerInfo(roomId);
+
+                    bankruptcy.put(roomId, bankruptcyCount - 1);
+
+                    players.put(roomId, playerList);
+
+                    SendMessage userDead = SendMessage.builder().Type("userDead").Message(name).build();
+                    messagingTemplate.convertAndSend("/topic/main-game/" + roomId, userDead);
+
+                    sendPlayerInfo(roomId);
+                });
+    }
+
+
+    @MessageMapping("main/main-game/end/{roomId}")
+    public void mainGameTheEnd(@DestinationVariable String roomId) {
+        List<Player> playerList = players.get(roomId);
+
+        long bankruptcyCount = playerList.stream()
+                .filter(player -> player.getMoney() < 0)
+                .count();
+
+        if (bankruptcyCount == 3) {
+            SendMessage theEnd = SendMessage.builder()
+                    .Type("TheEnd")
+                    .Message("the end")
+                    .build();
+            messagingTemplate.convertAndSend("/topic/main-game/" + roomId, theEnd);
         }
-
-        players.put(roomId, playerList);
-
-        sendPlayerInfo(roomId);
-
-        SendMessage userDead = SendMessage.builder().Type("userDead").Message(name).build();
-        messagingTemplate.convertAndSend("/topic/main-game/" + roomId, userDead);
     }
 
 
@@ -389,16 +451,6 @@ public class MainGameController {
         });
     }
 
-//    @MessageMapping("/main/bankruptcy/{roomId}")
-//    public void bankruptcy(@DestinationVariable String roomId, @Header String name) {
-//        players.get(roomId).forEach(player -> {
-//            if (player.isMyTurn() && player.getPlayer().equals(name)) {
-//                SendMessage miniGameStep = SendMessage.builder().Type("commend").Message("mini-game-step-open").build();
-//                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
-//            }
-//        });
-//    }
-
 
     @MessageMapping("/main/mini-game-step/{roomId}")
     public void miniGameStep(@DestinationVariable String roomId, @Header String name) {
@@ -430,17 +482,30 @@ public class MainGameController {
             messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameStep);
 
             SendMessage miniGameResult = SendMessage.builder()
-                    .Type("result")
+                    .Type("whatGame")
                     .Message(number)
                     .build();
             messagingTemplate.convertAndSend("/topic/mini-game/" + roomId, miniGameResult);
         });
     }
 
+    @MessageMapping("/mini-game/isWin/{roomId}")
+    public void miniGameIsWin(@DestinationVariable String roomId, @Header String name, @Header Boolean result) {
+        players.get(roomId).forEach(player -> {
+            if (player.isMyTurn() && player.getPlayer().equals(name)) {
+                player.setMoney(player.getMoney() + 500);
+
+                SendMessage miniGameIsWin = SendMessage.builder().Type("isWinResult").Message(result.toString()).build();
+                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameIsWin);
 
 
-    //                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
-//                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
+                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+            }
+        });
+    }
+
+
     public int throwYut() {
         int[] result = {1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 2};
         int rand = (int) (Math.random() * 16);
@@ -483,6 +548,8 @@ public class MainGameController {
                     .player("player" + gameData.getMyTurn())
                     .order(gameData.getMyTurn())
                     .myTurn(false)
+                    .rank(gameData.getMyTurn())
+                    .live(true)
                     .build();
             if (gameData.getMyTurn() == 1) {
                 player.setMyTurn(true);
