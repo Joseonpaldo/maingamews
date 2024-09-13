@@ -40,6 +40,7 @@ public class ChatController {
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
+
     }
 
     @EventListener
