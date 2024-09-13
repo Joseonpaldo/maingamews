@@ -1,6 +1,5 @@
 package org.example.websockettest.controller;
 
-import org.example.websockettest.dto.ChatMessage;
 import org.example.websockettest.dto.ChattingDto;
 import org.example.websockettest.entity.ChatMessageEntity;
 import org.example.websockettest.entity.ChatRoomEntity;
@@ -69,8 +68,5 @@ public class ChattingController {
 
         System.out.println("대화 저장: " + savedMessage);
     }
-
-
-
 
 }

@@ -421,6 +421,7 @@ public class MainGameController {
 
 
 
+
     //                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
 //                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
     public int throwYut() {
@@ -531,6 +532,7 @@ public class MainGameController {
                 .orElseThrow(() -> new IllegalArgumentException("Room not found"));
         gameRoom.setRoomStatus(3);
 
+
         // 방 관련 데이터 제거
         removeRoomData(roomId);
     }
@@ -542,6 +544,55 @@ public class MainGameController {
         currentOrder.remove(roomId.toString());
         currentThrow.remove(roomId.toString());
     }
+
+//    @MessageMapping("/main/end/{roomId}")
+//    public void endGame(@DestinationVariable Long roomId, @Payload List<PlayerResultDto> results) {
+//        List<PlayerResultDto> winnerList = new ArrayList<>();
+//        List<PlayerResultDto> loserList = new ArrayList<>();
+//
+//        results.forEach(result -> {
+//            UserEntity user = userRepositoryImpl.findByUserIdentifyId(result.getUserid());
+//            if (user == null) {
+//                throw new RuntimeException("User not found");
+//            }
+//
+//            // 승리한 플레이어 처리
+//            if (result.getRank().equals("1st")) {
+//                user.setWin4p(user.getWin4p() + 1);
+//                winnerList.add(result);
+//            } else {
+//                loserList.add(result);
+//            }
+//
+//            // 4인용 게임 참가 기록 업데이트
+//            user.setTot4p(user.getTot4p() + 1);
+//            userRepositoryImpl.save(user);
+//        });
+//
+//        // 게임 종료 처리 후 방 데이터 제거
+//        GameRoomEntity gameRoom = gameRoomRepositoryImpl.findById(roomId)
+//                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+//        gameRoom.setRoomStatus(3);
+//        gameRoomRepositoryImpl.save(gameRoom);
+//
+//        removeRoomData(roomId);
+//        System.out.println("방제거");
+//
+//        // 프론트로
+//        Map<String, Object> resultData = new HashMap<>();
+//        resultData.put("winners", winnerList);
+//        resultData.put("losers", loserList);
+//
+//        SendMessage sendMessage = SendMessage.builder()
+//                .Type("gameEndResult")
+//                .Message(JSONObject.toJSONString(resultData))
+//                .build();
+//        System.out.println("프론트결과" + sendMessage.toString());
+//
+//        messagingTemplate.convertAndSend("/topic/main-game/" + roomId, sendMessage);
+//    }
+//
+
 
 
 }

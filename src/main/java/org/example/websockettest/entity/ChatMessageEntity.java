@@ -32,4 +32,5 @@ public class ChatMessageEntity {
 
     @Column(nullable = false)
     private LocalDateTime sentAt;
+
 }
