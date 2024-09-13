@@ -1,10 +1,12 @@
 package org.example.websockettest.service;
 
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.example.websockettest.entity.ChatMessageEntity;
 import org.example.websockettest.entity.ChatRoomEntity;
 import org.example.websockettest.entity.UserEntity;
 import org.example.websockettest.repository.ChatMessageRepository;
+import org.example.websockettest.repository.GameRoomRepositoryImpl;
 import org.example.websockettest.repository.UserRepositoryImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -12,13 +14,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ChatMessageService {
 
-    @Autowired
-    private ChatMessageRepository chatMessageRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
-    @Autowired
-    private UserRepositoryImpl userRepository;  // UserEntity를 가져오기 위한 Repository 추가
+    private final UserRepositoryImpl userRepository;  // UserEntity를 가져오기 위한 Repository 추가
+
+    private final GameRoomRepositoryImpl gameRoomRepository;
+
+    private final UserService userService;
 
     // 메시지 저장 서비스
     @Transactional
@@ -41,6 +46,23 @@ public class ChatMessageService {
     // 특정 채팅방의 모든 메시지 불러오기
     public List<ChatMessageEntity> getMessagesByChatRoom(ChatRoomEntity chatRoom) {
         return chatMessageRepository.findByChatRoom(chatRoom);
+    }
+
+    public boolean hostCheck(Long roomId, Long userId){
+
+        var gameRoomEntity = gameRoomRepository.findByRoomId(roomId);
+        if (gameRoomEntity == null) {
+            return false;
+        }
+        System.out.println(gameRoomEntity.getUser().getUserId().equals(userId));
+        return gameRoomEntity.getUser().getUserId().equals(userId);
+    }
+
+    @Transactional
+    public void roomDelete(Long roomId, Long userId) {
+        UserEntity user = userService.getUser(userId);
+
+        gameRoomRepository.deleteByRoomIdAndUser(roomId, user);
     }
 }
 
