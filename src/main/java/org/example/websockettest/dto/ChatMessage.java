@@ -37,7 +37,8 @@ public class ChatMessage {
         UPDATE_SPEED,
         END_GAME,
         INVITE,
-        FRIEND_REQUEST
+        FRIEND_REQUEST,
+        DELETE_ROOM
     }
 
 }
