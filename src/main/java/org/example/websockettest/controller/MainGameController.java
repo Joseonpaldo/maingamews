@@ -253,10 +253,10 @@ public class MainGameController {
                         if (state.getLandmark() == 3) {
                             SendMessage results = SendMessage.builder().Type("toast").Message("광역시 이상 등급은 없습니다.").build();
                             messagingTemplate.convertAndSend("/topic/main-game/" + roomId, results);
-                            return;
+                        } else {
+                            state.setLandmark(state.getLandmark() + 1);
+                            player.setMoney(player.getMoney() - price);
                         }
-                        state.setLandmark(state.getLandmark() + 1);
-                        player.setMoney(player.getMoney() - price);
                     }
                 }
             }
@@ -312,8 +312,8 @@ public class MainGameController {
                 .sorted(Comparator.comparingDouble(Player::getMoney).reversed()) // money 기준으로 내림차순 정렬
                 .toList();
 
-            System.out.println("sortedPlayers");
-        sortedPlayers.forEach(player ->{
+        System.out.println("sortedPlayers");
+        sortedPlayers.forEach(player -> {
             System.out.println(player.getName());
             System.out.println(player.getRank());
         });
@@ -326,14 +326,14 @@ public class MainGameController {
 
         // 랭크가 업데이트된 플레이어를 playerList에 반영
         for (Player player : playerList) {
-                sortedPlayers.stream()
-                        .filter(sortedPlayer -> sortedPlayer.getPlayer().equals(player.getPlayer()))
-                        .findFirst()
-                        .ifPresent(sortedPlayer -> player.setRank(sortedPlayer.getRank())); // 순위가 있을 경우만 업데이트
+            sortedPlayers.stream()
+                    .filter(sortedPlayer -> sortedPlayer.getPlayer().equals(player.getPlayer()))
+                    .findFirst()
+                    .ifPresent(sortedPlayer -> player.setRank(sortedPlayer.getRank())); // 순위가 있을 경우만 업데이트
         }
 
-            System.out.println("playerList");
-        playerList.forEach(player ->{
+        System.out.println("playerList");
+        playerList.forEach(player -> {
             System.out.println(player.getName());
             System.out.println(player.getRank());
         });
