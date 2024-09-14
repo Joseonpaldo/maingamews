@@ -24,6 +24,9 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Controller
 @RequiredArgsConstructor
@@ -34,6 +37,8 @@ public class MainGameController {
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepositoryImpl userRepositoryImpl;
     private final GameRoomRepositoryImpl gameRoomRepositoryImpl;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
 
     public Map<String, List<Player>> players = new HashMap<>();
@@ -382,10 +387,7 @@ public class MainGameController {
                 .count();
 
         if (bankruptcyCount == 3) {
-            SendMessage theEnd = SendMessage.builder()
-                    .Type("TheEnd")
-                    .Message("the end")
-                    .build();
+            SendMessage theEnd = SendMessage.builder().Type("TheEnd").Message("the end").build();
             messagingTemplate.convertAndSend("/topic/main-game/" + roomId, theEnd);
         }
     }
@@ -493,14 +495,18 @@ public class MainGameController {
     public void miniGameIsWin(@DestinationVariable String roomId, @Header String name, @Header Boolean result) {
         players.get(roomId).forEach(player -> {
             if (player.isMyTurn() && player.getPlayer().equals(name)) {
-                player.setMoney(player.getMoney() + 500);
+                if (result) {
+                    player.setMoney(player.getMoney() + 500);
+                }
 
                 SendMessage miniGameIsWin = SendMessage.builder().Type("isWinResult").Message(result.toString()).build();
-                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameIsWin);
+                messagingTemplate.convertAndSend("/topic/mini-game/" + roomId, miniGameIsWin);
 
-
-                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
-                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+// 5초 뒤에 메시지 전송
+                scheduler.schedule(() -> {
+                    SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
+                    messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+                }, 5, TimeUnit.SECONDS);
             }
         });
     }
