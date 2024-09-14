@@ -24,6 +24,9 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Controller
 @RequiredArgsConstructor
@@ -34,6 +37,8 @@ public class MainGameController {
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepositoryImpl userRepositoryImpl;
     private final GameRoomRepositoryImpl gameRoomRepositoryImpl;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
 
     public Map<String, List<Player>> players = new HashMap<>();
@@ -253,10 +258,10 @@ public class MainGameController {
                         if (state.getLandmark() == 3) {
                             SendMessage results = SendMessage.builder().Type("toast").Message("광역시 이상 등급은 없습니다.").build();
                             messagingTemplate.convertAndSend("/topic/main-game/" + roomId, results);
-                            return;
+                        } else {
+                            state.setLandmark(state.getLandmark() + 1);
+                            player.setMoney(player.getMoney() - price);
                         }
-                        state.setLandmark(state.getLandmark() + 1);
-                        player.setMoney(player.getMoney() - price);
                     }
                 }
             }
@@ -312,8 +317,8 @@ public class MainGameController {
                 .sorted(Comparator.comparingDouble(Player::getMoney).reversed()) // money 기준으로 내림차순 정렬
                 .toList();
 
-            System.out.println("sortedPlayers");
-        sortedPlayers.forEach(player ->{
+        System.out.println("sortedPlayers");
+        sortedPlayers.forEach(player -> {
             System.out.println(player.getName());
             System.out.println(player.getRank());
         });
@@ -326,14 +331,14 @@ public class MainGameController {
 
         // 랭크가 업데이트된 플레이어를 playerList에 반영
         for (Player player : playerList) {
-                sortedPlayers.stream()
-                        .filter(sortedPlayer -> sortedPlayer.getPlayer().equals(player.getPlayer()))
-                        .findFirst()
-                        .ifPresent(sortedPlayer -> player.setRank(sortedPlayer.getRank())); // 순위가 있을 경우만 업데이트
+            sortedPlayers.stream()
+                    .filter(sortedPlayer -> sortedPlayer.getPlayer().equals(player.getPlayer()))
+                    .findFirst()
+                    .ifPresent(sortedPlayer -> player.setRank(sortedPlayer.getRank())); // 순위가 있을 경우만 업데이트
         }
 
-            System.out.println("playerList");
-        playerList.forEach(player ->{
+        System.out.println("playerList");
+        playerList.forEach(player -> {
             System.out.println(player.getName());
             System.out.println(player.getRank());
         });
@@ -382,10 +387,7 @@ public class MainGameController {
                 .count();
 
         if (bankruptcyCount == 3) {
-            SendMessage theEnd = SendMessage.builder()
-                    .Type("TheEnd")
-                    .Message("the end")
-                    .build();
+            SendMessage theEnd = SendMessage.builder().Type("TheEnd").Message("the end").build();
             messagingTemplate.convertAndSend("/topic/main-game/" + roomId, theEnd);
         }
     }
@@ -493,14 +495,18 @@ public class MainGameController {
     public void miniGameIsWin(@DestinationVariable String roomId, @Header String name, @Header Boolean result) {
         players.get(roomId).forEach(player -> {
             if (player.isMyTurn() && player.getPlayer().equals(name)) {
-                player.setMoney(player.getMoney() + 500);
+                if (result) {
+                    player.setMoney(player.getMoney() + 500);
+                }
 
                 SendMessage miniGameIsWin = SendMessage.builder().Type("isWinResult").Message(result.toString()).build();
-                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, miniGameIsWin);
+                messagingTemplate.convertAndSend("/topic/mini-game/" + roomId, miniGameIsWin);
 
-
-                SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
-                messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+// 5초 뒤에 메시지 전송
+                scheduler.schedule(() -> {
+                    SendMessage passTurn = SendMessage.builder().Type("passTurn").Message(name).build();
+                    messagingTemplate.convertAndSend("/topic/main-game/" + roomId, passTurn);
+                }, 5, TimeUnit.SECONDS);
             }
         });
     }
